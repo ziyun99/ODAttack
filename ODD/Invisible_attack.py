@@ -31,11 +31,13 @@ import pdb
 class EOTB_attack(ODD_logic):
     def __init__(self, config, args):
         super(EOTB_attack, self).__init__(config, args)
+        self.success = 0
+        self.overall_pics = 0
 
     def build_attack(self):
-        if self.disp_console : print("Building attack graph...")
+        if self.config.disp_console : print("Building attack graph...")
         # compute the EOT-transformed masked inter in a batch, 
-        if self.useEOT == True:
+        if self.config.useEOT == True:
             print("Building EOT Model graph!")
             self.EOT_transforms = transformation.target_sample()
             self.num_of_EOT_transforms = len(self.EOT_transforms)
@@ -68,7 +70,7 @@ class EOTB_attack(ODD_logic):
         
         
         # compute the EOT-transformed masked inter in a batch, 
-        if self.useEOT == True:
+        if self.config.useEOT == True:
             # broadcast self.masked_inter [1,448,448,3] into [num_of_EOT_transforms, 448, 448, 3]
             self.masked_inter_batch = self.masked_inter
             for i in range(self.num_of_EOT_transforms):
@@ -94,11 +96,11 @@ class EOTB_attack(ODD_logic):
 
         init_dict = {'yolo_model_input': self.constrained,
                      'yolo_mode': "init_model",
-                     'yolo_disp_console': self.disp_console,
+                     'yolo_disp_console': self.config.disp_console,
                      'session': self.sess}
 
         # init a model instance
-        self.object_detector = self.model(init_dict)
+        self.object_detector = self.config.model(init_dict)
         self.C_target = self.object_detector.get_output_tensor()
 
         MODEL_variables = self.object_detector.get_yolo_variables()
@@ -127,7 +129,7 @@ class EOTB_attack(ODD_logic):
         self.loss = self.C_target+self.punishment*self.distance_L2+self.smoothness_punishment*self.non_smoothness
 
         # set optimizer
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate)#GradientDescentOptimizerAdamOptimizer
+        self.optimizer = tf.train.AdamOptimizer(self.config.learning_rate)#GradientDescentOptimizerAdamOptimizer
         self.attackoperator = self.optimizer.minimize(self.loss,var_list=[self.inter])
 
         # init and load weights by variables
@@ -135,10 +137,10 @@ class EOTB_attack(ODD_logic):
 
         # restore model variable
         saver = tf.train.Saver(MODEL_variables)
-        saver.restore(self.sess,self.weights_file)
+        saver.restore(self.sess,self.config.weights_file)
 
 
-        if self.disp_console : print("Loading complete!" + '\n')
+        if self.config.disp_console : print("Loading complete!" + '\n')
 
 
 
@@ -169,7 +171,7 @@ class EOTB_attack(ODD_logic):
         Target_Loss = []
         Image_Loss = []
         # np.random.shuffle(img_list)
-        for i in range(self.steps):
+        for i in range(self.config.steps):
             # prepare attack batch
             for j in range(self.num_of_EOT_transforms):
                 choose = np.random.randint(len(img_list))
@@ -201,7 +203,7 @@ class EOTB_attack(ODD_logic):
             ##
 
         strtime = str(time.time()-s)
-        if self.disp_console : print('Elapsed time : ' + strtime + ' secs' + '\n')
+        if self.config.disp_console : print('Elapsed time : ' + strtime + ' secs' + '\n')
         print("Attack finished!")
 
         result = self.interpret_output(net_output[0][0])
@@ -216,7 +218,7 @@ class EOTB_attack(ODD_logic):
 
         # copy a new array out
         pic_in_numpy_0_255_copy = np.array(pic_in_numpy_0_255)
-        _object = self.mask_list[0]
+        _object = self.config.mask_list[0]
         xmin = int(_object['bndbox']['xmin'])
         ymin = int(_object['bndbox']['ymin'])
         xmax = int(_object['bndbox']['xmax'])
@@ -238,7 +240,7 @@ class EOTB_attack(ODD_logic):
             # can also write as np.where(cond, v1, v2)
             for i in range(paste_xmin,paste_xmax):
                 for j in range(paste_ymin,paste_ymax):
-                    if resized_logo_mask[j-paste_ymin,i-paste_xmin,0]==self.very_small:
+                    if resized_logo_mask[j-paste_ymin,i-paste_xmin,0]==self.config.very_small:
                         # plot logo
                         pic_in_numpy_0_255_copy[j,i] = 255
 
@@ -272,16 +274,16 @@ class EOTB_attack(ODD_logic):
         boxes[:,:,:,2] = np.multiply(boxes[:,:,:,2],boxes[:,:,:,2])
         boxes[:,:,:,3] = np.multiply(boxes[:,:,:,3],boxes[:,:,:,3])
 
-        boxes[:,:,:,0] *= self.w_img
-        boxes[:,:,:,1] *= self.h_img
-        boxes[:,:,:,2] *= self.w_img
-        boxes[:,:,:,3] *= self.h_img
+        boxes[:,:,:,0] *= self.config.w_img
+        boxes[:,:,:,1] *= self.config.h_img
+        boxes[:,:,:,2] *= self.config.w_img
+        boxes[:,:,:,3] *= self.config.h_img
 
         for i in range(2):
             for j in range(20):
                 probs[:,:,i,j] = np.multiply(class_probs[:,:,j],scales[:,:,i])
 
-        filter_mat_probs = np.array(probs>=self.threshold,dtype='bool')
+        filter_mat_probs = np.array(probs>=self.config.threshold,dtype='bool')
         filter_mat_boxes = np.nonzero(filter_mat_probs)
 
         boxes_filtered = boxes[filter_mat_boxes[0],filter_mat_boxes[1],filter_mat_boxes[2]]
@@ -297,7 +299,7 @@ class EOTB_attack(ODD_logic):
         for i in range(len(boxes_filtered)):
             if probs_filtered[i] == 0 : continue
             for j in range(i+1,len(boxes_filtered)):
-                if self._iou(boxes_filtered[i],boxes_filtered[j]) > self.iou_threshold : 
+                if self._iou(boxes_filtered[i],boxes_filtered[j]) > self.config.iou_threshold : 
                     probs_filtered[j] = 0.0
 
         filter_iou = np.array(probs_filtered>0.0,dtype='bool')
@@ -308,7 +310,7 @@ class EOTB_attack(ODD_logic):
 
         result = []
         for i in range(len(boxes_filtered)):
-            result.append([self.classes[classes_num_filtered[i]],
+            result.append([self.config.classes[classes_num_filtered[i]],
                            boxes_filtered[i][0],
                            boxes_filtered[i][1],
                            boxes_filtered[i][2],
@@ -319,8 +321,8 @@ class EOTB_attack(ODD_logic):
 
     def show_results(self, img, results):
         img_cp = img.copy()
-        if self.filewrite_txt :
-            ftxt = open(self.tofile_txt,'w')
+        if self.config.filewrite_txt :
+            ftxt = open(self.config.tofile_txt,'w')
         class_results_set = set()
         for i in range(len(results)):
             x = int(results[i][1])
@@ -328,21 +330,21 @@ class EOTB_attack(ODD_logic):
             w = int(results[i][3])//2
             h = int(results[i][4])//2
             class_results_set.add(results[i][0])
-            if self.disp_console : print('    class : ' + 
+            if self.config.disp_console : print('    class : ' + 
                                          results[i][0] + ' , [x,y,w,h]=[' + 
                                          str(x) + ',' + str(y) + ',' + 
                                          str(int(results[i][3])) + ',' + 
                                          str(int(results[i][4]))+'], Confidence = ' + 
                                          str(results[i][5]))
 
-            if self.filewrite_img or self.imshow:
+            if self.config.filewrite_img or self.config.imshow:
                 cv2.rectangle(img_cp,(x-w,y-h),(x+w,y+h),(0,255,0),2)
                 cv2.rectangle(img_cp,(x-w,y-h-20),(x+w,y-h),(125,125,125),-1)
                 cv2.putText(img_cp,
                             results[i][0] + ' : %.2f' % results[i][5],(x-w+5,y-h-7),
                             cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0),1)
 
-            if self.filewrite_txt :                
+            if self.config.filewrite_txt :                
                 ftxt.write(results[i][0] + ',' + str(x) + ',' + str(y) + ',' + str(w) + ',' + str(h)+',' + str(results[i][5]) + '\n')
         # suppose we want to know how attack performs on class "person"
         if "person" not in class_results_set:
@@ -351,15 +353,15 @@ class EOTB_attack(ODD_logic):
         else:
             print("Attack failed!")
 
-        if self.filewrite_img : 
-            if self.disp_console : print('image file writed : ' + self.tofile_img)
-            cv2.imwrite(self.tofile_img, img_cp)
+        if self.config.filewrite_img : 
+            if self.config.disp_console : print('image file writed : ' + self.config.tofile_img)
+            cv2.imwrite(self.config.tofile_img, img_cp)
 
-        if self.filewrite_txt : 
-            if self.disp_console : print('txt file writed : ' + self.tofile_txt)
+        if self.config.filewrite_txt : 
+            if self.config.disp_console : print('txt file writed : ' + self.config.tofile_txt)
             ftxt.close()
 
-        if self.imshow :
+        if self.config.imshow :
             cv2.imshow('detection display', img_cp)
             cv2.waitKey(1)
             
