@@ -23,6 +23,7 @@ import time
 class PatchTrainer(object):
     def __init__(self, mode):
         # self.config = patch_config.patch_configs[mode]()
+        return
 
     def load_attack():
         self.darknet_model = Darknet(self.config.cfgfile)
@@ -199,7 +200,7 @@ def main():
         print(patch_config.patch_configs)
 
     cfg = sys.argv[1]
-    config = attack_config.patch_configs[cfg]()
+    config = patch_config.patch_configs[cfg]()
     attacker = PatchTrainer(config, sys.argv[3:])
     attacker.attack()
 

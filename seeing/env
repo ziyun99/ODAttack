@@ -1,0 +1,65 @@
+### Install Tensorflow and Pytorch using Conda ###
+## Reference/Credits: https://towardsdatascience.com/tensorflow-gpu-installation-made-easy-use-conda-instead-of-pip-52e5249374bc
+
+## Install Miniconda ##
+wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh  --no-check-certificate
+bash Miniconda3-latest-Linux-x86_64.sh
+source .bashrc
+
+
+## Configure the terminal to automatically 'source .bashrc' everytime upon login ##
+vim .bash_profile
+
+# copy n paste the below code into .bash_profile #
+if [ -r ~/.bashrc ]; then
+   source ~/.bashrc
+fi
+
+
+## Create a virtual environment (and install tensorflow into the environment) using conda ##
+conda create --name tf_gpu tensorflow-gpu
+
+## Activate the virtual environment ##
+conda activate tf_gpu
+
+## Install Pytorch into the environment ##
+pip install torch torchvision
+
+
+#### INSTALLATION DONE! ####
+
+
+## VERIFY YOUR INSTALLATION ##
+conda activate tf_gpu
+python
+>>> import tensorflow as tf
+>>> print("GPU is", "available" if tf.config.experimental.list_physical_devices("GPU") else "NOT AVAILABLE")
+>>> tf.test.is_gpu_available()
+>>> import torch
+>>> torch.cuda.is_available()
+
+
+### Exit the virtual environment ###
+conda deactivate
+
+## To list your all conda virtual environment(s) ##
+conda info --envs
+
+
+conda install -c conda-forge opencv
+conda install -c conda-forge matplotlib
+conda install pandas
+conda install -c conda-forge notebook
+conda install pillow, lxml, jupyter, matplotlib, opencv, cython
+
+### How to open Jupyter Notebook in browser ###
+conda activate tf_gpu
+jupyter notebook --no-browser --port=8889 --ip=0.0.0.0
+ssh -L 8080:gemini1:8889 ziyun@gemini1
+http://localhost:8080
+
+
+### Open Tensorboard in browser
+tensorboard --host 0.0.0.0 --port 8888 --logdir logdir
+ssh -L 8888:gemini1:8888 ziyun@gemini1
+http://localhost:8888
