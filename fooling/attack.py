@@ -1,7 +1,6 @@
 """
 Training code for Adversarial patch training
 
-
 """
 
 import PIL
@@ -20,9 +19,11 @@ import patch_config
 import sys
 import time
 
-class PatchTrainer(object):
-    def __init__(self, mode):
-        # self.config = patch_config.patch_configs[mode]()
+class Fooling(object):
+    def __init__(self, config, args):
+        self.config = config
+        # self.load_attack()
+        # self.writer = self.init_tensorboard()
         return
 
     def load_attack():

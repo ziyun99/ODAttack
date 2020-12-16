@@ -15,89 +15,91 @@ import pdb
 from future.utils import with_metaclass
 
 
-class ODD_logic(with_metaclass(ABCMeta, object)):
+# class ODD_logic(with_metaclass(ABCMeta, object)):
+class ODD_logic():
 
-    def __init__(self, model):
+    def __init__(self):
         """
         Abstract base class for ODD. With some visualization tools inside.
         """
+        return
         # default value
-        self.disp_console = True
-        self.model = model
-        self.success = 0
-        self.overall_pics = 0
-        self.path = './result/'
-        self.very_small = 0.000001
-        self.mask_list = None
+        # self.disp_console = True
+        # # self.model = model
+        # self.success = 0
+        # self.overall_pics = 0
+        # self.path = './result/'
+        # self.very_small = 0.000001
+        # self.mask_list = None
         
-        # global variable to be parsed in argv_parser()
-        self.h_img = None
-        self.w_img = None
-        self.d_img = None
-        self.fromfile = None 
-        self.frommaskfile = None
-        self.fromlogofile = None
-        self.fromfolder = None
+        # # global variable to be parsed in argv_parser()
+        # self.h_img = None
+        # self.w_img = None
+        # self.d_img = None
+        # self.fromfile = None 
+        # self.frommaskfile = None
+        # self.fromlogofile = None
+        # self.fromfolder = None
 
 
-    def __call__(self, argvs = []):
-        self.argv_parser(argvs)
-        self.build_model_attack_graph()
+    # def __call__(self, argvs = []):
+    #     self.argv_parser(argvs)
+    #     self.build_model_attack_graph()
         
-        self._attack()
+    #     self._attack()
         
-        return None
+    #     return None
 
-    @abstractmethod
-    def argv_parser(self, argvs, **kwargs):
-        """
-        Parse given command information as attack setting.
+    # @abstractmethod
+    # def argv_parser(self, argvs, **kwargs):
+    #     """
+    #     Parse given command information as attack setting.
 
-        Args:
-        argvs: The adversary object.
-        **kwargs: Other named arguments.
-        """
-        raise NotImplementedError
-
-
-    @abstractmethod
-    def build_model_attack_graph(self, **kwargs):
-        """
-        Prepare an end-to-end differentiable model.
-
-        Args:
-        **kwargs: Other named arguments.
-        """
-        raise NotImplementedError
+    #     Args:
+    #     argvs: The adversary object.
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
 
 
-    @abstractmethod
-    def attack_optimize(self, img_list, mask, logo_mask=None, resized_logo_mask=None, **kwargs):
-        """
-        Customize optimization process. The goal is to make the most robust(generalize) ad sticker on real inputs.
-        As attack objective varies, the cost function can be tailered to it.
+    # @abstractmethod
+    # def build_model_attack_graph(self, **kwargs):
+    #     """
+    #     Prepare an end-to-end differentiable model.
+
+    #     Args:
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
+
+
+    # @abstractmethod
+    # def attack_optimize(self, img_list, mask, logo_mask=None, resized_logo_mask=None, **kwargs):
+    #     """
+    #     Customize optimization process. The goal is to make the most robust(generalize) ad sticker on real inputs.
+    #     As attack objective varies, the cost function can be tailered to it.
         
-        Args:
-        img_list: The adversary object.
-        mask: The numpy array with shape equals to a sample.
-        logo_mask: The numpy array mask for perturbed area.
-        resized_logo_mask: The logo_mask that resized.
-        **kwargs: Other named arguments.
-        """
-        raise NotImplementedError
+    #     Args:
+    #     img_list: The adversary object.
+    #     mask: The numpy array with shape equals to a sample.
+    #     logo_mask: The numpy array mask for perturbed area.
+    #     resized_logo_mask: The logo_mask that resized.
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
 
-    @abstractmethod
-    def interpret_output(self, output):
-        """
-        Comprehend inferenced tensor from model for user interface.
+    # @abstractmethod
+    # def interpret_output(self, output):
+    #     """
+    #     Comprehend inferenced tensor from model for user interface.
         
-        Args:
-        output: Inferenced tensor from model.
-        """
-        raise NotImplementedError
+    #     Args:
+    #     output: Inferenced tensor from model.
+    #     """
+    #     raise NotImplementedError
     
 
-    def _attack(self, **kwargs):
+    def attack(self, **kwargs):
         """
         Implement task oriented attack. Organise file level attack logic.
         

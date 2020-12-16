@@ -1,5 +1,6 @@
-from torch import optim
-
+# from torch import optim
+import importlib
+import os
 
 class BaseConfig(object):
     """
@@ -10,62 +11,25 @@ class BaseConfig(object):
         """
         Set the defaults.
         """
-        self.img_dir = "inria/Train/pos"
-        self.lab_dir = "inria/Train/pos/yolo-labels"
-        self.cfgfile = "cfg/yolo.cfg"
-        self.weightfile = "weights/yolo.weights"
-        self.printfile = "non_printability/30values.txt"
-        self.patch_size = 300
+        self.attack_method = "invisible"
+        self.attack_class = "EOTB_attack"
+        self.path = os.path.join(os.getcwd(),'invisible/')
+        self.out_path = os.path.join(os.getcwd(),'invisible/result/')
 
-        self.start_learning_rate = 0.03
-
-        self.patch_name = 'base'
-
-        self.scheduler_factory = lambda x: optim.lr_scheduler.ReduceLROnPlateau(x, 'min', patience=50)
-        self.max_tv = 0
-
-        self.batch_size = 20
-
-        self.loss_target = lambda obj, cls: obj * cls
-
-from object_detectors.yolo_tiny_model_updated import YOLO_tiny_model_updated
-
-class ODD_Base(BaseConfig):
+class ODD(BaseConfig):
     """
     Reproduce the results from the paper: Generate a patch that minimises object score.
     """
 
     def __init__(self):
         # default value
+        super().__init__()
         self.disp_console = True
-        self.model = YOLO_tiny_model_updated
+        model_file = importlib.import_module("invisible.object_detectors.yolo_tiny_model_updated")
+        self.model = getattr(model_file, "YOLO_tiny_model_updated")
         self.success = 0
         self.overall_pics = 0
-        self.path = './result/'
-        self.very_small = 0.000001
-        self.mask_list = None
         
-        # global variable to be parsed in argv_parser()
-        self.h_img = None
-        self.w_img = None
-        self.d_img = None
-        self.fromfile = None 
-        self.frommaskfile = None
-        self.fromlogofile = None
-        self.fromfolder = None
-
-class ODD(ODD_Base):
-    """
-    Reproduce the results from the paper: Generate a patch that minimises object score.
-    """
-
-    def __init__(self):
-        # default value
-        self.disp_console = True
-        self.model = YOLO_tiny_model_updated
-        self.success = 0
-        self.overall_pics = 0
-        self.path = './result/'
         self.very_small = 0.000001
         self.mask_list = None
         
@@ -82,13 +46,13 @@ class ODD(ODD_Base):
         # init global variable
         self.filewrite_img = False
         self.filewrite_txt = False
-        self.tofile_img = os.path.join(self.path,'output.jpg')
-        self.tofile_txt = os.path.join(self.path,'output.txt')
+        self.tofile_img = os.path.join(self.out_path,'output.jpg')
+        self.tofile_txt = os.path.join(self.out_path,'output.txt')
         
         self.imshow = False
         self.useEOT = True
         self.Do_you_want_ad_sticker = True
-        self.weights_file = 'weights/YOLO_tiny.ckpt'
+        self.weights_file = os.path.join(self.path,'weights/YOLO_tiny.ckpt')
         
         # optimization settings
         self.learning_rate = 1e-2
@@ -121,7 +85,7 @@ class ODD(ODD_Base):
                          "tvmonitor"]
 
 
-patch_configs = {
+custom_configs = {
     "base": BaseConfig,
     "odd": ODD
 }

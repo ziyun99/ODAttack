@@ -10,11 +10,15 @@ class BaseConfig(object):
         """
         Set the defaults.
         """
-        self.img_dir = "inria/Train/pos"
-        self.lab_dir = "inria/Train/pos/yolo-labels"
-        self.cfgfile = "cfg/yolo.cfg"
-        self.weightfile = "weights/yolo.weights"
-        self.printfile = "non_printability/30values.txt"
+        self.attack_method = "fooling"
+        self.attack_class = "Fooling"
+        self.path = os.path.join(os.getcwd(),'fooling/')
+        
+        self.img_dir = os.path.join(self.path,"inria/Train/pos")
+        self.lab_dir = os.path.join(self.path,"inria/Train/pos/yolo-labels")
+        self.cfgfile = os.path.join(self.path,"cfg/yolo.cfg")
+        self.weightfile = os.path.join(self.path,"weights/yolo.weights")
+        self.printfile = os.path.join(self.path,"non_printability/30values.txt")
         self.patch_size = 300
 
         self.start_learning_rate = 0.03
@@ -121,13 +125,22 @@ class ReproducePaperObj(BaseConfig):
 
         self.loss_target = lambda obj, cls: obj
 
+class Try(ReproducePaperObj):
+    """
+    Reproduce the results from the paper: Generate a patch that minimises object score.
+    """
 
-patch_configs = {
+    def __init__(self):
+        super().__init__()
+
+
+custom_configs = {
     "base": BaseConfig,
     "exp1": Experiment1,
     "exp1_des": Experiment1Desktop,
     "exp2_high_res": Experiment2HighRes,
     "exp3_low_res": Experiment3LowRes,
     "exp4_class_only": Experiment4ClassOnly,
-    "paper_obj": ReproducePaperObj
+    "paper_obj": ReproducePaperObj,
+    "try": Try,
 }

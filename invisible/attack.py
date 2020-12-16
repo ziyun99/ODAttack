@@ -1,11 +1,3 @@
-import sys
-
-# choose attack method
-from attack_methods.eotb_attack import EOTB_attack
-
-# choose white-box models
-from object_detectors.yolo_tiny_model_updated import YOLO_tiny_model_updated
-
 '''
 This is an implementation for phycisal attack on test distribution.
 
@@ -22,17 +14,25 @@ import tensorflow as tf
 import time
 import os
 
-from EOT_simulation import transformation
-from attack_methods.base_logic import ODD_logic
+# from EOT_simulation import transformation
+from invisible.attack_methods.base_logic import ODD_logic
 
-import pdb
+# import pdb
 
+# import sys
+# # choose attack method
+# from attack_methods.eotb_attack import EOTB_attack
+# # choose white-box models
+# from object_detectors.yolo_tiny_model_updated import YOLO_tiny_model_updated
 
 class EOTB_attack(ODD_logic):
     def __init__(self, config, args):
-        super(EOTB_attack, self).__init__(config, args)
+        super(EOTB_attack, self).__init__()
+        self.model = config.model
+        self.config = config
         self.success = 0
         self.overall_pics = 0
+        # self.build_attack()
 
     def build_attack(self):
         if self.config.disp_console : print("Building attack graph...")
