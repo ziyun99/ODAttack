@@ -1,4 +1,5 @@
 import sys
+import os
 import importlib
 
 def create_attacker(argvs):
@@ -15,7 +16,6 @@ def create_attacker(argvs):
     try:
         cfgfile = importlib.import_module("configs." + input_method)
         config = cfgfile.custom_configs[input_config]()
-
     # except ModuleNotFoundError as e:
     #     print(e)
     #     exit()
@@ -29,6 +29,8 @@ def create_attacker(argvs):
     attack_class = getattr(attackfile, config.attack_class)
     attacker = attack_class(config, input_args)
     
+    attackpath = os.path.join(os.getcwd(),input_method) 
+    sys.path.insert(0, attackpath)
     return attacker
 
 def main():
@@ -38,5 +40,5 @@ def main():
     # attacker.attack()
     
     
-if __name__=='__main__':    
+if __name__=='__main__':
     main()
