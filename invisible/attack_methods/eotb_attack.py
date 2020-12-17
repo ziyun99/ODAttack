@@ -20,8 +20,8 @@ import pdb
 
 
 class EOTB_attack(ODD_logic):
-    def __init__(self, model):
-        super(EOTB_attack, self).__init__(model)
+    def __init__(self):
+        super(EOTB_attack, self).__init__()
         # init global variable
         self.filewrite_img = False
         self.filewrite_txt = False

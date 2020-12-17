@@ -22,11 +22,10 @@ import time
 class Fooling(object):
     def __init__(self, config, args):
         self.config = config
-        # self.load_attack()
-        # self.writer = self.init_tensorboard()
+        self.load_attack()
         return
 
-    def load_attack():
+    def load_attack(self):
         self.darknet_model = Darknet(self.config.cfgfile)
         self.darknet_model.load_weights(self.config.weightfile)
         self.darknet_model = self.darknet_model.eval().cuda() # TODO: Why eval?
@@ -36,7 +35,7 @@ class Fooling(object):
         self.nps_calculator = NPSCalculator(self.config.printfile, self.config.patch_size).cuda()
         self.total_variation = TotalVariation().cuda()
 
-        self.writer = self.init_tensorboard(mode)
+        self.writer = self.init_tensorboard()
 
     def init_tensorboard(self, name=None):
         subprocess.Popen(['tensorboard', '--logdir=runs'])

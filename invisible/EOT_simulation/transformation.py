@@ -156,13 +156,13 @@ def transform6para(V, transx = 0, transy = 0, transz = 0, rotz = 0, roty = 0, ro
 
 def target_sample(display = False):
     sample_matrixes = []
-    img = cv2.imread("calibration_file/calibration.JPG")
-    calib = cv2.imread("calibration_file/calibration.jpg")
+    img = cv2.imread("invisible/calibration_file/calibration.JPG")
+    calib = cv2.imread("invisible/calibration_file/calibration.jpg")
     
     height, width, channels = img.shape
     
 
-    f = open("calibration_file/calibration.xml")
+    f = open("invisible/calibration_file/calibration.xml")
     dic = xmltodict.parse(f.read())
 
     xmin = int(dic['annotation']['object']['bndbox']['xmin'])

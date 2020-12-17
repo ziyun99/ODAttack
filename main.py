@@ -12,6 +12,10 @@ def create_attacker(argvs):
     input_config = argvs[2]
     input_args = argvs[3:]
 
+    # add to PYTHONPATH
+    attackpath = os.path.join(os.getcwd(),input_method) 
+    sys.path.insert(0, attackpath)
+
     # get config
     try:
         cfgfile = importlib.import_module("configs." + input_method)
@@ -29,8 +33,6 @@ def create_attacker(argvs):
     attack_class = getattr(attackfile, config.attack_class)
     attacker = attack_class(config, input_args)
     
-    attackpath = os.path.join(os.getcwd(),input_method) 
-    sys.path.insert(0, attackpath)
     return attacker
 
 def main():

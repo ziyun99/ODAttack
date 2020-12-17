@@ -14,7 +14,7 @@ import tensorflow as tf
 import time
 import os
 
-# from EOT_simulation import transformation
+from EOT_simulation import transformation
 from invisible.attack_methods.base_logic import ODD_logic
 
 # import pdb
@@ -32,7 +32,7 @@ class EOTB_attack(ODD_logic):
         self.config = config
         self.success = 0
         self.overall_pics = 0
-        # self.build_attack()
+        self.build_attack()
 
     def build_attack(self):
         if self.config.disp_console : print("Building attack graph...")

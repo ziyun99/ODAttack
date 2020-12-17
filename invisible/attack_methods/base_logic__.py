@@ -14,42 +14,89 @@ import xmltodict
 import pdb
 from future.utils import with_metaclass
 
-from try.attack_methods.attack_base import Attack_Base
-
-
 # class ODD_logic(with_metaclass(ABCMeta, object)):
-class ODD_logic(Attack_Base):
+class ODD_logic():
 
-    def __init__(self, model):
+    def __init__(self):
         """
         Abstract base class for ODD. With some visualization tools inside.
         """
-        super(ODD_logic, self).__init__(config, args)
-
-    @abstractmethod
-    def attack_optimize(self, img_list, mask, logo_mask=None, resized_logo_mask=None, **kwargs):
-        """
-        Customize optimization process. The goal is to make the most robust(generalize) ad sticker on real inputs.
-        As attack objective varies, the cost function can be tailered to it.
+        return
+        # default value
+        # self.disp_console = True
+        # # self.model = model
+        # self.success = 0
+        # self.overall_pics = 0
+        # self.path = './result/'
+        # self.very_small = 0.000001
+        # self.mask_list = None
         
-        Args:
-        img_list: The adversary object.
-        mask: The numpy array with shape equals to a sample.
-        logo_mask: The numpy array mask for perturbed area.
-        resized_logo_mask: The logo_mask that resized.
-        **kwargs: Other named arguments.
-        """
-        raise NotImplementedError
+        # # global variable to be parsed in argv_parser()
+        # self.h_img = None
+        # self.w_img = None
+        # self.d_img = None
+        # self.fromfile = None 
+        # self.frommaskfile = None
+        # self.fromlogofile = None
+        # self.fromfolder = None
 
-    @abstractmethod
-    def interpret_output(self, output):
-        """
-        Comprehend inferenced tensor from model for user interface.
+
+    # def __call__(self, argvs = []):
+    #     self.argv_parser(argvs)
+    #     self.build_model_attack_graph()
         
-        Args:
-        output: Inferenced tensor from model.
-        """
-        raise NotImplementedError
+    #     self._attack()
+        
+    #     return None
+
+    # @abstractmethod
+    # def argv_parser(self, argvs, **kwargs):
+    #     """
+    #     Parse given command information as attack setting.
+
+    #     Args:
+    #     argvs: The adversary object.
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
+
+
+    # @abstractmethod
+    # def build_model_attack_graph(self, **kwargs):
+    #     """
+    #     Prepare an end-to-end differentiable model.
+
+    #     Args:
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
+
+
+    # @abstractmethod
+    # def attack_optimize(self, img_list, mask, logo_mask=None, resized_logo_mask=None, **kwargs):
+    #     """
+    #     Customize optimization process. The goal is to make the most robust(generalize) ad sticker on real inputs.
+    #     As attack objective varies, the cost function can be tailered to it.
+        
+    #     Args:
+    #     img_list: The adversary object.
+    #     mask: The numpy array with shape equals to a sample.
+    #     logo_mask: The numpy array mask for perturbed area.
+    #     resized_logo_mask: The logo_mask that resized.
+    #     **kwargs: Other named arguments.
+    #     """
+    #     raise NotImplementedError
+
+    # @abstractmethod
+    # def interpret_output(self, output):
+    #     """
+    #     Comprehend inferenced tensor from model for user interface.
+        
+    #     Args:
+    #     output: Inferenced tensor from model.
+    #     """
+    #     raise NotImplementedError
+    
 
     def attack(self, **kwargs):
         """
@@ -58,14 +105,14 @@ class ODD_logic(Attack_Base):
         Args:
         **kwargs: Other named arguments.
         """
-        assert self.config.fromfile is not None or self.config.fromfolder is not None
+        assert self.fromfile is not None or self.fromfolder is not None
         
-        if self.config.fromfile is not None and self.config.frommaskfile is not None:
-            adversarial_output = self._attack_from_file(self.config.fromfile, self.config.frommaskfile, self.config.fromlogofile)
+        if self.fromfile is not None and self.frommaskfile is not None:
+            adversarial_output = self._attack_from_file(self.fromfile, self.frommaskfile, self.fromlogofile)
 
 
-        if self.config.fromfolder is not None:
-            filename_list = os.listdir(self.config.fromfolder)
+        if self.fromfolder is not None:
+            filename_list = os.listdir(self.fromfolder)
             # take pics name out and construct xml filename to read from
             for filename in filename_list:
                 pic_name = re.match(r'\d+.JPG', filename)
@@ -75,8 +122,8 @@ class ODD_logic(Attack_Base):
                     print(("Pics number:",self.overall_pics,"The",pic_name[0], "!"))
 
                     pic_mask_name = pic_name[0][:-3]+"xml"
-                    fromfile = self.config.fromfolder+"/"+pic_name[0]
-                    frommask = self.config.fromfolder+"/"+pic_mask_name
+                    fromfile = self.fromfolder+"/"+pic_name[0]
+                    frommask = self.fromfolder+"/"+pic_mask_name
 
                     self._attack_from_file(fromfile, frommask)
 
@@ -92,12 +139,12 @@ class ODD_logic(Attack_Base):
         maskfilename: The complete path for mask coordination.
         **kwargs: Other named arguments.
         """
-        if self.config.disp_console : print('Generating from ' + sample_folder + '...')
+        if self.disp_console : print('Generating from ' + sample_folder + '...')
 
         sample_list = self._get_sample_list(sample_folder)
         # record scale of the orginal images
-        self.config.h_img, self.config.w_img, self.config.d_img = sample_list[0][1].shape
-        mask = self.config.very_small * np.ones(shape = sample_list[0][1].shape)
+        self.h_img, self.w_img, self.d_img = sample_list[0][1].shape
+        mask = self.very_small * np.ones(shape = sample_list[0][1].shape)
 
         # if there is logo file, prepare logo_mask
         logo_mask = None
@@ -109,9 +156,9 @@ class ODD_logic(Attack_Base):
                                                 flag)
         
         print("Generating Mask...")
-        self.config.mask_list = self._parse_mask(maskfilename)
+        self.mask_list = self._parse_mask(maskfilename)
         resized_logo_mask_list = []
-        for _object in self.config.mask_list:
+        for _object in self.mask_list:
             xmin, ymin, xmax, ymax = self._get_mask_coordination(_object)
             mask = self._generate_MaskArea(mask, xmin, ymin, xmax, ymax)
             
@@ -203,13 +250,13 @@ class ODD_logic(Attack_Base):
         reconstruct_img_resized_np=(ad_x_squeezed+1.0)/2.0*255.0
         print(("min and max in img(numpy form):",reconstruct_img_resized_np.min(),reconstruct_img_resized_np.max()))
 
-        reconstruct_img_np=cv2.resize(reconstruct_img_resized_np,(self.config.w_img,self.config.h_img))#reconstruct_img_BGR
+        reconstruct_img_np=cv2.resize(reconstruct_img_resized_np,(self.w_img,self.h_img))#reconstruct_img_BGR
         reconstruct_img_np_squeezed=np.squeeze(reconstruct_img_np)
         
         # choose to generate invisible clothe
         user_input = "Yes"
         save_name = 'HD_sticker.jpg'
-        while user_input!="No" and self.config.Do_you_want_ad_sticker is True:
+        while user_input!="No" and self.Do_you_want_ad_sticker is True:
             # user_input = eval(input("Do you want an invisible clothe? Yes/No:"))
             if True:
                 print("Ok!")
@@ -238,7 +285,7 @@ class ODD_logic(Attack_Base):
         """
         is_saved = None
         
-        _object = self.config.mask_list[0]
+        _object = self.mask_list[0]
         xmin, ymin, xmax, ymax = self._get_mask_coordination(_object)
         print((xmin,ymin,xmax,ymax))
         
@@ -268,13 +315,13 @@ class ODD_logic(Attack_Base):
             
             for i in range(paste_xmin,paste_xmax):
                 for j in range(paste_ymin,paste_ymax):
-                    if logo_mask[j-paste_ymin,i-paste_xmin,0]==self.config.very_small:
+                    if logo_mask[j-paste_ymin,i-paste_xmin,0]==self.very_small:
                         new_sticker[j,i] = 255
         
         assert new_sticker is not None
-        is_saved=cv2.imwrite(self.config.path+save_name, new_sticker)
+        is_saved=cv2.imwrite(self.path+save_name, new_sticker)
         if is_saved:
-            print(("Sticker saved under:", self.config.path+save_name))
+            print(("Sticker saved under:", self.path+save_name))
         else:
             print("Sticker saving error")
 
@@ -303,7 +350,7 @@ class ODD_logic(Attack_Base):
         """
         turn logopic into binary matrix logo_mask.
         """
-        logo_mask = np.where(logopic>flag, self.config.very_small, 1)
+        logo_mask = np.where(logopic>flag, self.very_small, 1)
 
         return logo_mask
     
