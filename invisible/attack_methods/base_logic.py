@@ -14,11 +14,8 @@ import xmltodict
 import pdb
 from future.utils import with_metaclass
 
-from try.attack_methods.attack_base import Attack_Base
-
-
 # class ODD_logic(with_metaclass(ABCMeta, object)):
-class ODD_logic(Attack_Base):
+class ODD_logic():
 
     def __init__(self):
         """

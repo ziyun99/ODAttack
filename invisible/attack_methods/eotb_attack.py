@@ -15,7 +15,7 @@ import time
 import os
 
 from EOT_simulation import transformation
-from attack_methods.base_logic import ODD_logic
+from attack_methods.base_logic_ import ODD_logic
 import pdb
 
 

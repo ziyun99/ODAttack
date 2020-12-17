@@ -12,15 +12,14 @@ import matplotlib.pyplot as plt
 
 from PIL import Image
 
-from .object_detection.utils import config_util
-from .object_detection.utils import label_map_util
-from .object_detection.utils import variables_helper
-from .object_detection.utils import visualization_utils
+from object_detection.utils import config_util
+from object_detection.utils import label_map_util
+from object_detection.utils import variables_helper
+from object_detection.utils import visualization_utils
 
-from .object_detection.builders import model_builder
-
-from .object_detection.utils.object_detection_evaluation import ObjectDetectionEvaluator
-from .object_detection.core.standard_fields import InputDataFields, DetectionResultFields
+from object_detection.builders import model_builder
+from object_detection.utils.object_detection_evaluation import ObjectDetectionEvaluator
+from object_detection.core.standard_fields import InputDataFields, DetectionResultFields
 
 def parse_args(texture_yaw_min=0, texture_yaw_max=0,
                texture_pitch_min=0, texture_pitch_max=0,

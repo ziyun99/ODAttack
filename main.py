@@ -29,7 +29,7 @@ def create_attacker(argvs):
         exit()
         
     # get attacker class
-    attackfile = importlib.import_module(input_method + ".attack")
+    attackfile = importlib.import_module("attack")   #import [input_method].attack
     attack_class = getattr(attackfile, config.attack_class)
     attacker = attack_class(config, input_args)
     
@@ -39,7 +39,7 @@ def main():
     attacker = create_attacker(sys.argv)
     print(attacker.__dict__)
     print(attacker.config.__dict__)
-    # attacker.attack()
+    attacker.attack()
     
     
 if __name__=='__main__':

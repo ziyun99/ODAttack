@@ -37,8 +37,8 @@ class ODD(BaseConfig):
         self.h_img = None
         self.w_img = None
         self.d_img = None
-        self.fromfile = None 
-        self.frommaskfile = None
+        self.fromfile = os.path.join(self.path, "data_sampling") 
+        self.frommaskfile = os.path.join(self.path, "test/EOTB.xml")
         self.fromlogofile = None
         self.fromfolder = None
 

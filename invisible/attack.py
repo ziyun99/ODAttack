@@ -15,15 +15,7 @@ import time
 import os
 
 from EOT_simulation import transformation
-from invisible.attack_methods.base_logic import ODD_logic
-
-# import pdb
-
-# import sys
-# # choose attack method
-# from attack_methods.eotb_attack import EOTB_attack
-# # choose white-box models
-# from object_detectors.yolo_tiny_model_updated import YOLO_tiny_model_updated
+from attack_methods.base_logic import ODD_logic
 
 class EOTB_attack(ODD_logic):
     def __init__(self, config, args):

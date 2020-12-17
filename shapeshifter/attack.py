@@ -15,29 +15,37 @@ import tensorflow as tf
 from functools import partial
 from PIL import Image
 
-from shapeshifter.shapeshifter import parse_args
-from shapeshifter.shapeshifter import load_and_tile_images
-from shapeshifter.shapeshifter import create_model
-from shapeshifter.shapeshifter import create_textures
-from shapeshifter.shapeshifter import create_attack
-from shapeshifter.shapeshifter import create_evaluation
-from shapeshifter.shapeshifter import batch_accumulate
-from shapeshifter.shapeshifter import plot
+from shapeshifter import parse_args
+from shapeshifter import load_and_tile_images
+from shapeshifter import create_model
+from shapeshifter import create_textures
+from shapeshifter import create_attack
+from shapeshifter import create_evaluation
+from shapeshifter import batch_accumulate
+from shapeshifter import plot
 
+import argparse
+import matplotlib.pyplot as plt
+
+from object_detection.utils import config_util
+from object_detection.utils import label_map_util as label_map_util
+from object_detection.utils import variables_helper
+from object_detection.utils import visualization_utils
+
+from object_detection.builders import model_builder
+from object_detection.utils.object_detection_evaluation import ObjectDetectionEvaluator
+from object_detection.core.standard_fields import InputDataFields, DetectionResultFields
 
 class Shapeshifter(object):
     def __init__(self, config, argrs):
         self.config = self.load_config(config)
         self.setup_logging()
-        self.load_attack()
-        # self.attack()
         # self.load_attack()
-        # self.writer = self.init_tensorboard()
         return
 
     def load_config(self, config):
         # Create tuples from -min -max self.config
-        for key in list(vars(config.__dict__)):
+        for key in list(vars(config)):
             if key.endswith('_min'):
                 key = key[:-4]
                 setattr(config, key + '_range', (getattr(config, key + '_min'), getattr(config, key + '_max')))
@@ -58,28 +66,28 @@ class Shapeshifter(object):
     
     def setup_logging(self):
         # Setup logging
-        logger = logging.getLogger()
-        logger.setLevel(logging.ERROR)
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.ERROR)
         tf.logging.set_verbosity(tf.logging.ERROR)
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-        log = logging.getLogger('shapeshifter')
-        log.setLevel(logging.DEBUG if self.config.verbose else logging.INFO)
-        formatter = logging.Formatter('%(asctime)s: %(levelname)s %(name)s: %(message)s')
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        log.addHandler(handler)
-        log.propagate = False
+        self.log = logging.getLogger('shapeshifter')
+        self.log.setLevel(logging.DEBUG if self.config.verbose else logging.INFO)
+        self.formatter = logging.Formatter('%(asctime)s: %(levelname)s %(name)s: %(message)s')
+        self.handler = logging.StreamHandler()
+        self.handler.setFormatter(self.formatter)
+        self.log.addHandler(self.handler)
+        self.log.propagate = False
 
-    def load_attack(self):
+    def attack(self):
         # Set seeds from the start
         if self.config.seed:
-            log.debug("Setting seed")
+            self.log.debug("Setting seed")
             np.random.seed(self.config.seed)
             tf.set_random_seed(self.config.seed)
 
         # Load textures, backgrounds and objects (and their masks)
-        log.debug("Loading backgrounds, textures, textures masks, objects, and objects masks")
+        self.log.debug("Loading backgrounds, textures, textures masks, objects, and objects masks")
         backgrounds = load_and_tile_images(self.config.backgrounds)
 
         textures = load_and_tile_images(self.config.textures)
@@ -147,22 +155,22 @@ class Shapeshifter(object):
                                         seed=self.config.seed)
 
         # Create adversarial textures, composite them on object, and pass composites into model. Finally, create summary statistics.
-        log.debug("Creating perturbable textures")
+        self.log.debug("Creating perturbable textures")
         textures_var_, textures_ = create_textures(textures, 1.0, # initial_texture doesn't really matter
                                                 use_spectral=self.config.spectral,
                                                 soft_clipping=self.config.soft_clipping)
 
-        log.debug("Creating composited input images")
+        self.log.debug("Creating composited input images")
         input_images_ = create_composited_images(self.config.batch_size, textures_, textures_masks)
 
-        log.debug("Creating object detection model")
+        self.log.debug("Creating object detection model")
         predictions, detections, losses = create_model(input_images_, self.config.model_config, self.config.model_checkpoint, is_training=True)
 
-        log.debug("Creating attack losses")
+        self.log.debug("Creating attack losses")
         victim_class_, target_class_, losses_summary_ = create_attack(textures_, textures_var_, predictions, losses,
                                                                     optimizer_name=self.config.optimizer, clip=self.config.sign_gradients)
 
-        log.debug("Creating evaluation metrics")
+        self.log.debug("Creating evaluation metrics")
         metrics_summary_, texture_summary_ = create_evaluation(victim_class_, target_class_,
                                                             textures_, textures_masks, input_images_, detections)
 
@@ -172,12 +180,12 @@ class Shapeshifter(object):
         local_init_op_ = tf.local_variables_initializer()
 
         # Create tensorboard file writer for train and test evaluations
-        saver = tf.train.Saver([textures_var_, tf.train.get_global_step()])
-        train_writer = None
-        test_writer = None
+        self.saver = tf.train.Saver([textures_var_, tf.train.get_global_step()])
+        self.train_writer = None
+        self.test_writer = None
 
         if self.config.logdir is not None:
-            log.debug(f"Tensorboard logging: {self.config.logdir}")
+            self.log.debug(f"Tensorboard logging: {self.config.logdir}")
             os.makedirs(self.config.logdir, exist_ok=True)
 
             arguments_summary_ = tf.summary.text('Arguments', tf.constant('```' + ' '.join(sys.argv[1:]) + '```'))
@@ -185,11 +193,11 @@ class Shapeshifter(object):
 
             graph = None
             if self.config.save_graph:
-                log.debug("Graph will be saved to tensorboard")
+                self.log.debug("Graph will be saved to tensorboard")
                 graph = tf.get_default_graph()
 
-            train_writer = tf.summary.FileWriter(self.config.logdir + '/train', graph=graph)
-            test_writer = tf.summary.FileWriter(self.config.logdir + '/test')
+            self.train_writer = tf.summary.FileWriter(self.config.logdir + '/train', graph=graph)
+            self.test_writer = tf.summary.FileWriter(self.config.logdir + '/test')
 
             # Find existing checkpoint
             os.makedirs(self.config.logdir + '/checkpoints', exist_ok=True)
@@ -197,7 +205,7 @@ class Shapeshifter(object):
             self.config.checkpoint = checkpoint_path
 
         # Create session
-        log.debug("Creating session")
+        self.log.debug("Creating session")
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
 
@@ -207,15 +215,15 @@ class Shapeshifter(object):
 
         # Set initial texture
         if self.config.checkpoint is not None:
-            log.debug(f"Restoring from checkpoint: {self.config.checkpoint}")
-            saver.restore(sess, self.config.checkpoint)
+            self.log.debug(f"Restoring from checkpoint: {self.config.checkpoint}")
+            self.saver.restore(sess, self.config.checkpoint)
         else:
             if self.config.gray_start:
-                log.debug("Setting texture to gray")
+                self.log.debug("Setting texture to gray")
                 textures = np.zeros_like(textures) + 128/255
 
             if self.config.random_start > 0:
-                log.debug(f"Adding uniform random perturbation texture with at most {self.config.random_start}/255 per pixel")
+                self.log.debug(f"Adding uniform random perturbation texture with at most {self.config.random_start}/255 per pixel")
                 textures = textures + np.random.randint(size=textures.shape, low=-self.config.random_start, high=self.config.random_start)/255
 
             sess.run('project_op', { 'textures:0': textures  })
@@ -223,12 +231,12 @@ class Shapeshifter(object):
         # Get global step
         step = sess.run('global_step:0')
 
-        if train_writer is not None:
-            log.debug("Running arguments summary")
+        if self.train_writer is not None:
+            self.log.debug("Running arguments summary")
             summary = sess.run(arguments_summary_)
 
-            train_writer.add_summary(summary, step)
-            test_writer.add_summary(summary, step)
+            self.train_writer.add_summary(summary, step)
+            self.test_writer.add_summary(summary, step)
 
         loss_tensors = ['total_loss:0',
                         'total_rpn_cls_loss:0', 'total_rpn_loc_loss:0',
@@ -244,7 +252,7 @@ class Shapeshifter(object):
 
         output_tensors = loss_tensors + metric_tensors
 
-        log.info('global_step [%s]', ', '.join([tensor.replace(':0', '').replace('total_', '') for tensor in output_tensors]))
+        self.log.info('global_step [%s]', ', '.join([tensor.replace(':0', '').replace('total_', '') for tensor in output_tensors]))
 
         test_feed_dict = { 'learning_rate:0': self.config.learning_rate,
                         'momentum:0': self.config.momentum,
@@ -273,23 +281,23 @@ class Shapeshifter(object):
                         'victim_class:0': self.config.victim_class,
                         'target_class:0': self.config.target_class }
 
-    def attack(self):
+    # def attack(self):
         # Keep attacking until CTRL+C. The only issue is that we may be in the middle of some operation.
         try:
-            log.debug("Entering attacking loop (use ctrl+c to exit)")
+            self.log.debug("Entering attacking loop (use ctrl+c to exit)")
             while True:
                 # Run summaries as necessary
                 if self.config.logdir and step % self.config.save_checkpoint_every == 0:
-                    log.debug("Saving checkpoint")
+                    self.log.debug("Saving checkpoint")
                     saver.save(sess, self.config.logdir + '/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
 
-                if step % self.config.save_texture_every == 0 and test_writer is not None:
-                    log.debug("Writing texture summary")
+                if step % self.config.save_texture_every == 0 and self.test_writer is not None:
+                    self.log.debug("Writing texture summary")
                     test_texture = sess.run(texture_summary_)
-                    test_writer.add_summary(test_texture, step)
+                    self.test_writer.add_summary(test_texture, step)
 
                 if step % self.config.save_test_every == 0:
-                    log.debug("Runnning test summaries")
+                    self.log.debug("Runnning test summaries")
                     start_time = time.time()
 
                     sess.run(local_init_op_)
@@ -299,15 +307,15 @@ class Shapeshifter(object):
                                     detections, predictions, self.config.categories)
 
                     end_time = time.time()
-                    log.debug(f"Loss accumulation took {end_time - start_time} seconds")
+                    self.log.debug(f"Loss accumulation took {end_time - start_time} seconds")
 
                     test_output = sess.run(output_tensors, test_feed_dict)
-                    log.info('test %d %s', step, test_output)
+                    self.log.info('test %d %s', step, test_output)
 
-                    if test_writer is not None:
-                        log.debug("Writing test summaries")
+                    if self.test_writer is not None:
+                        self.log.debug("Writing test summaries")
                         test_summaries = sess.run(summaries_, test_feed_dict)
-                        test_writer.add_summary(test_summaries, step)
+                        self.test_writer.add_summary(test_summaries, step)
 
                 # Create train feed_dict
                 train_feed_dict = test_feed_dict.copy()
@@ -325,7 +333,7 @@ class Shapeshifter(object):
                 train_feed_dict['texture_gaussian_noise_stddev:0'] = self.config.texture_gaussian_noise_stddev_range
 
                 # Zero out gradient accumulation, losses, and metrics, then accumulate batches
-                log.debug("Starting gradient accumulation...")
+                self.log.debug("Starting gradient accumulation...")
                 start_time = time.time()
 
 
@@ -336,32 +344,32 @@ class Shapeshifter(object):
                                 detections, predictions, self.config.categories)
 
                 end_time = time.time()
-                log.debug(f"Gradient accumulation took {end_time - start_time} seconds")
+                self.log.debug(f"Gradient accumulation took {end_time - start_time} seconds")
 
                 train_output = sess.run(output_tensors, train_feed_dict)
-                log.info('train %d %s', step, train_output)
+                self.log.info('train %d %s', step, train_output)
 
-                if step % self.config.save_train_every == 0 and train_writer is not None:
-                    log.debug("Writing train summaries")
+                if step % self.config.save_train_every == 0 and self.train_writer is not None:
+                    self.log.debug("Writing train summaries")
                     train_summaries = sess.run(summaries_, test_feed_dict)
-                    train_writer.add_summary(train_summaries, step)
+                    self.train_writer.add_summary(train_summaries, step)
 
                 # Update textures and project texture to feasible set
                 # TODO: We can probably run these together but probably need some control dependency
-                log.debug("Projecting attack")
+                self.log.debug("Projecting attack")
                 sess.run('attack_op', train_feed_dict)
                 sess.run('project_op')
                 step = sess.run('global_step:0')
 
         except KeyboardInterrupt:
-            log.warn('Interrupted')
+            self.log.warn('Interrupted')
 
         finally:
-            if test_writer is not None:
-                test_writer.close()
+            if self.test_writer is not None:
+                self.test_writer.close()
 
-            if train_writer is not None:
-                train_writer.close()
+            if self.train_writer is not None:
+                self.train_writer.close()
 
             if sess is not None:
                 sess.close()
@@ -433,7 +441,7 @@ def create_composited_images(batch_size, textures, masks, interpolation='BILINEA
 
     #input_images_ = tf.clip_by_value(input_images_, 0.0, 1.0)
 
-    input_images_ = tf.fake_quant_with_min_max_self.config(input_images_, min=0., max=1., num_bits=8)
+    input_images_ = tf.fake_quant_with_min_max_args(input_images_, min=0., max=1., num_bits=8)
     input_images_ = tf.identity(input_images_, name='input_images')
 
     return input_images_
