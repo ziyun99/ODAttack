@@ -17,10 +17,6 @@ class BaseConfig(object):
         self.out_path = os.path.join(os.getcwd(),'invisible/result/')
 
 class ODD(BaseConfig):
-    """
-    Reproduce the results from the paper: Generate a patch that minimises object score.
-    """
-
     def __init__(self):
         # default value
         super().__init__()
