@@ -77,19 +77,19 @@ class Seeing():
         print("Network successfully loaded")
         
         self.model.net_info["height"] = self.config.reso
-        self.inp_dim = int(model.net_info["height"])
+        self.inp_dim = int(self.model.net_info["height"])
         
         assert self.inp_dim % 32 == 0
         assert self.inp_dim > 32
 
-        self.model.to(device)
+        self.model.to(self.config.device)
         self.model.eval() #Set the model in evaluation mode
 
         self.num_classes = 80
         self.classes = load_classes(self.config.classes)
 
     def attack(self):
-        img_ori = get_test_input(self.inp_dim, self.config.CUDA)
+        img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
         prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
         ori_index = 11
         ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
@@ -101,17 +101,17 @@ class Seeing():
         adv_label = torch.from_numpy(adv_label).float()
 
         s = time.time()
-        patch_adv, input1 = get_adv_episilon(img_ori, adv_label, first_index, ori_index)
+        patch_adv, input1 = self.get_adv_episilon(img_ori, adv_label, first_index, ori_index)
         e = time.time()
         print("time_taken: ", str(e-s))
         
-        save_img(patch_adv, output_dir + 'final/adv_stop')
-        det_and_save_img(input1, output_dir + 'final/adv_img')
+        save_img(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
+        det_and_save_img(input1, os.path.join(self.config.out_path, 'final/adv_img'))
 
         print("Done and exit")
                           
     def get_adv_episilon(self, img_ori,adv_label,first_index,ori_index):
-        self.writer = init_tensorboard()
+        self.writer = self.init_tensorboard()
         
         fir_p = 0.3
         dist_p = 1.0
@@ -124,22 +124,22 @@ class Seeing():
         nps_flag = False
         satur_flag = True
         
-        text = "Experiment: " + exp + " | fir: " + str(fir_flag) + " " + str(fir_p) + " | dist: " + str(dist_flag) + " " + str(dist_p) + " | tv: " + str(tv_flag) + " " + str(tv_p) + " | nps: " + str(nps_flag) + " " + str(nps_p) + " | satur: " + str(satur_flag) + " " + str(satur_p)
+        text = "Experiment: " + self.config.exp + " | fir: " + str(fir_flag) + " " + str(fir_p) + " | dist: " + str(dist_flag) + " " + str(dist_p) + " | tv: " + str(tv_flag) + " " + str(tv_p) + " | nps: " + str(nps_flag) + " " + str(nps_p) + " | satur: " + str(satur_flag) + " " + str(satur_p)
         self.writer.add_text('param', text, 0) 
 
         # x_c=100
         # y_c=150
 
         #img_ori
-        img_ori=get_test_input_ori(self.inp_dim, self.config.CUDA)
+        img_ori= self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=get_stop_patch(input_dim=201)
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201)
         original_stop0 = original_stop
         
         #pole
         # patch_pole=torch.zeros(3,27,201).to(device)
-        ori_pole=get_pole('imgs/pole/pole.jpg')
+        ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
 
         #patch_fix
         # patch_fix=original_stop
@@ -153,7 +153,7 @@ class Seeing():
         scheduler = scheduler_factory(optimizer)
         print("patch_four", patch_four.requires_grad)
         
-        printability_array = get_printability_array().to(device)
+        printability_array = self.get_printability_array().to(self.config.device)
         
         init_time = time.time()
         suc_rate = 0
@@ -393,17 +393,17 @@ class Seeing():
     #                 patch_four.data.clamp_(0,1)       #keep patch in image range
                                 
                     if j==0:
-                    epoch_total_loss = loss
-                    epoch_det_loss = det_loss
-                    epoch_fir_loss = fir_loss
-                    epoch_dist_loss = dist_loss
+                        epoch_total_loss = loss
+                        epoch_det_loss = det_loss
+                        epoch_fir_loss = fir_loss
+                        epoch_dist_loss = dist_loss
                     
                     else:
-                    epoch_total_loss += loss
-                    epoch_det_loss += det_loss
-                    epoch_fir_loss += fir_loss
-                    epoch_dist_loss += dist_loss
-                    
+                        epoch_total_loss += loss
+                        epoch_det_loss += det_loss
+                        epoch_fir_loss += fir_loss
+                        epoch_dist_loss += dist_loss
+                        
 
                     if j%5 == 0:
                         iteration = jsteps * i + j
@@ -519,33 +519,83 @@ class Seeing():
         return patch_fix, input1
         #return patch_fix,output_adv
 
-def get_test_input(input_dim, CUDA):
-    img = cv2.imread("imgs/det/stop_sign.jpg")
-    # img = cv2.imread("det/stop_sign.png")
-    img = cv2.resize(img, (input_dim, input_dim))
+    def get_test_input(self, input_dim, CUDA, img):
+        img = cv2.imread(img)
+        # img = cv2.imread("det/stop_sign.png")
+        img = cv2.resize(img, (input_dim, input_dim))
 
-    img_ =  img.transpose((2,0,1))
-    img_ = img_[np.newaxis,:,:,:]/255.0
-    img_ = torch.from_numpy(img_).float()
-    img_ = Variable(img_)
+        img_ =  img.transpose((2,0,1))
+        img_ = img_[np.newaxis,:,:,:]/255.0
+        img_ = torch.from_numpy(img_).float()
+        img_ = Variable(img_)
 
-#     if CUDA:
-    img_ = img_.to(device)
-    return img_
+    #     if CUDA:
+        img_ = img_.to(self.config.device)
+        return img_
 
-def get_test_input_ori(input_dim, CUDA):
-    img = cv2.imread("imgs/det/stop_sign.jpg")
-    img = cv2.resize(img, (input_dim, input_dim))
+    def init_tensorboard(self,name=None):
+    #     subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir ./runs'])
+    #     attack_name = "adam" + "_batch" + "_dist" + "test"
+        time_str = time.strftime("%Y%m%d-%H%M%S")
+        return SummaryWriter(f'runs/{time_str}_{self.config.exp}')
+    #     return SummaryWriter(comment=attack_name)
 
-    img_ =  img.transpose((2,0,1))
-    img_ = img_[np.newaxis,:,:,:]/255.0
-    img_ = torch.from_numpy(img_).float()
-    img_ = Variable(img_)
+    def get_stop_patch(self, input_dim=201):
+        # images='stop/'
+        img = cv2.imread(os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
+        img = cv2.resize(img, (input_dim, input_dim))
+        img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
+        img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
+        stop_ori=img_out.to(self.config.device)
 
-#     if CUDA:
-    img_ = img_.to(device)
-    return img_
+        width=input_dim
+        height=input_dim
+        map_ori=torch.zeros(1,3,width,height).to(self.config.device)
+        #get character image
+        #   map_character_ori=torch.zeros(1,3,width,height).to(self.config.device)
+        
+        #  control the ratio of the patch on stop sign
+        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.58)]=1#rec_70  #ratio: 0.20
+        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.58)]=1
+        
+        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.72)]=1#rec_100  #0.29
+        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.72)]=1
+        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.444)]=1#rec_90  #0.11
+        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.444)]=1
+        map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.674)]=1#rec_90   #0.26
+        map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.674)]=1
+        map_stop=-(map_ori-1)
 
+        patch_stop=stop_ori*map_ori
+        return stop_ori[0,:,:,:],map_ori[0,:,:,:],map_stop[0,:,:,:],patch_stop[0,:,:,:]   #output:original stop, map mask for patch, map mask for stop, four patch
+        #original_stop,map_4_patches,map_4_stop,patch_four
+
+    def get_pole(self, character_path):
+        img = cv2.imread(character_path)
+        img = cv2.resize(img, (201, 27))
+        img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
+        img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
+        return img_out.to(self.config.device)
+
+    def get_printability_array(self):
+        printability_list = []
+        side = 201
+        # read in printability triplets and put them in a list
+        with open(self.config.path + "helper/print.txt") as f:
+            for line in f:
+                printability_list.append(line.split(","))
+        printability_array = []
+        for printability_triplet in printability_list:
+            printability_imgs = []
+            red, green, blue = printability_triplet
+            printability_imgs.append(np.full((side, side), red))
+            printability_imgs.append(np.full((side, side), green))
+            printability_imgs.append(np.full((side, side), blue))
+            printability_array.append(printability_imgs)
+        printability_array = np.asarray(printability_array)
+        printability_array = np.float32(printability_array)
+        pa = torch.from_numpy(printability_array)
+        return pa
 
 def write_archor(x, results):
     c1 = tuple(x[1:3].int())
@@ -767,63 +817,6 @@ def get_character_input(input_dim, character_path):
     img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
     return img_out.to(device)
 
-def get_pole(character_path):
-    img = cv2.imread(character_path)
-    img = cv2.resize(img, (201, 27))
-    img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
-    img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
-    return img_out.to(device)
-
-def get_stop_patch(input_dim=201):
-    images='stop/'
-    img = cv2.imread('imgs/stop/stop1.jpg')
-    img = cv2.resize(img, (input_dim, input_dim))
-    img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
-    img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
-    stop_ori=img_out.to(device)
-
-    width=input_dim
-    height=input_dim
-    map_ori=torch.zeros(1,3,width,height).to(device)
-    #get character image
-    #   map_character_ori=torch.zeros(1,3,width,height).to(device)
-    
-    #  control the ratio of the patch on stop sign
-    #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.58)]=1#rec_70  #ratio: 0.20
-    #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.58)]=1
-    
-    #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.72)]=1#rec_100  #0.29
-    #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.72)]=1
-    #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.444)]=1#rec_90  #0.11
-    #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.444)]=1
-    map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.674)]=1#rec_90   #0.26
-    map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.674)]=1
-    map_stop=-(map_ori-1)
-
-    patch_stop=stop_ori*map_ori
-    return stop_ori[0,:,:,:],map_ori[0,:,:,:],map_stop[0,:,:,:],patch_stop[0,:,:,:]   #output:original stop, map mask for patch, map mask for stop, four patch
-    #original_stop,map_4_patches,map_4_stop,patch_four
-
-def get_printability_array():
-    printability_list = []
-    side = 201
-    # read in printability triplets and put them in a list
-    with open("print.txt") as f:
-        for line in f:
-            printability_list.append(line.split(","))
-    printability_array = []
-    for printability_triplet in printability_list:
-        printability_imgs = []
-        red, green, blue = printability_triplet
-        printability_imgs.append(np.full((side, side), red))
-        printability_imgs.append(np.full((side, side), green))
-        printability_imgs.append(np.full((side, side), blue))
-        printability_array.append(printability_imgs)
-    printability_array = np.asarray(printability_array)
-    printability_array = np.float32(printability_array)
-    pa = torch.from_numpy(printability_array)
-    return pa
-
 def get_ind2(prediction,ori_index):
     conf_mask = ((prediction[:,:,4] > confidence)).float().unsqueeze(2)#confidence>0.5
     max_a,max_b=torch.max(prediction[:,:,5:5+ num_classes],2)
@@ -1026,9 +1019,4 @@ def yolo_test(num_test, patch_test):
 
     return suc_rate, suc_step, total_frames
 
-def init_tensorboard(name=None):
-#     subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir ./runs'])
-#     attack_name = "adam" + "_batch" + "_dist" + "test"
-    time_str = time.strftime("%Y%m%d-%H%M%S")
-    return SummaryWriter(f'runs/{time_str}_{exp}')
-#     return SummaryWriter(comment=attack_name)
+

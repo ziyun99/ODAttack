@@ -1,6 +1,8 @@
 # from torch import optim
 import importlib
 import os
+import time
+import torch
 
 class BaseConfig(object):
     """
@@ -24,9 +26,9 @@ class BaseConfig(object):
         self.fps = 1.2
 
         # directory
-        self.stop_dir = "imgs/stop/"    #Image / Directory containing stop signs to generate AE
-        self.bg_dir = "imgs/bg/road/"   #Image / Directory containing backgrounds to generate AE
-        self.output_dir = "output/batch/"   #Image / Directory to store AE generated
+        self.stop_dir = os.path.join(self.path,"imgs/stop/")    #Image / Directory containing stop signs to generate AE
+        self.bg_dir = os.path.join(self.path,"imgs/bg/road/")   #Image / Directory containing backgrounds to generate AE
+        self.output_dir = os.path.join(self.path,"output/batch/")   #Image / Directory to store AE generated
     
         #detection parameters
         self.bs = 1     # Batch size
@@ -35,13 +37,13 @@ class BaseConfig(object):
         self.scales = "1,2,3"
     
         #model parameters
-        self.cfg = "yolov3/cfg/yolov3.cfg" 
-        self.weights = "yolov3/weights/yolov3.weights"
-        self.classes = "yolov3/data/coco.names"
+        self.cfg = os.path.join(self.path,"yolov3/cfg/yolov3.cfg") 
+        self.weights = os.path.join(self.path,"yolov3/weights/yolov3.weights")
+        self.classes = os.path.join(self.path,"yolov3/data/coco.names")
         self.reso = "416"  #Input resolution of the network. Increase to increase accuracy. Decrease to increase speed
     
         self.CUDA = torch.cuda.is_available()
-        self.device = torch.device("cuda" if CUDA else "cpu")
+        self.device = torch.device("cuda" if self.CUDA else "cpu")
         
 class Seeing(BaseConfig):
     def __init__(self):
