@@ -194,7 +194,7 @@ def get_loss_median(img_adv,map_bounding):
     #print("loss_medien_smoothness:",loss)
     return loss
 
-def get_loss_saturation(img_adv,map_bounding):
+def get_loss_saturation(img_adv,map_bounding, device):
     img_adv=img_adv[0,:,:,:].cuda()
     map_bounding=map_bounding[0,0,:,:].cuda()
     m_max=torch.max(img_adv,0)[0]

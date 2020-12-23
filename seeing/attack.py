@@ -158,10 +158,10 @@ class Seeing():
         init_time = time.time()
         suc_rate = 0
         try: 
-            for i in range(nsteps):
+            for i in range(self.config.nsteps):
                 start = time.time()
                 jsteps=20
-                original_stop = get_random_stop_ori(imlist_stop).to(device)
+                original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
                 original_stop = original_stop[0, :, :, :]
                 for j in range(jsteps):
                     print("\nEpoch: {}, step: {}".format(i, j))
@@ -179,16 +179,16 @@ class Seeing():
                     map_ori=torch.zeros(1,3,416,416)
                     map_resize=torch.zeros(1,3,416,416)
                     #img_input
-                    img_input=torch.zeros(1,3,416,416).to(device)
-                    img_input2=torch.zeros(1,3,416,416).to(device)
+                    img_input=torch.zeros(1,3,416,416).to(self.config.device)
+                    img_input2=torch.zeros(1,3,416,416).to(self.config.device)
                     #perspective
-                    ori_stop_perspective=torch.zeros(3,201,201).to(device)
-                    ori_stop2=torch.zeros(3,201,201).to(device)
-                    ori_stop2_pers=torch.zeros(3,201,201).to(device)
+                    ori_stop_perspective=torch.zeros(3,201,201).to(self.config.device)
+                    ori_stop2=torch.zeros(3,201,201).to(self.config.device)
+                    ori_stop2_pers=torch.zeros(3,201,201).to(self.config.device)
                     #patch
                     patch_transform=img_ori[0,:, start_x:start_x+width,start_y:start_y+height]
                     patch_pers_transform=img_ori[0,:, start_x:start_x+width,start_y:start_y+height]
-                    patch_pole_transform=torch.zeros(3,27,201).to(device)
+                    patch_pole_transform=torch.zeros(3,27,201).to(self.config.device)
 
                     k = random.randint(0,4)
                     addweight_transform = "False"
@@ -196,7 +196,7 @@ class Seeing():
                         addweight_transform = "True"
                         # brightness and contrast transformation
                         ch, h, w = patch_fix.shape #[3,201,201]
-                        src2 = torch.zeros([ch, h, w], dtype = patch_fix.dtype).to(device)
+                        src2 = torch.zeros([ch, h, w], dtype = patch_fix.dtype).to(self.config.device)
                         a = random.uniform(0.8, 1.4)
                         g = random.uniform(-0.2, 0.2)
                         patch_transform = a*patch_fix + (1-a)*src2 + g
@@ -228,7 +228,7 @@ class Seeing():
                                         [w-w2,h-h2]]], dtype = torch.float32)
 
                         # compute perspective transform
-                        M = kornia.get_perspective_transform(org, dst).to(device)
+                        M = kornia.get_perspective_transform(org, dst).to(self.config.device)
 
                         # warp the original image by the found transform
                         patch_pers_transform = kornia.warp_perspective(patch_transform.unsqueeze(0), M, dsize=(h, w)).squeeze()
@@ -242,7 +242,7 @@ class Seeing():
                     print("patch_pers_transform", patch_pers_transform.requires_grad)
 
                 
-                    img_ori = get_random_img_ori(imlist_back).to(device)
+                    img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
                     ratio = random.uniform(0.1, 0.5)
                     x_c = random.randint(99,400-int(ratio*(100+201)))# x_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
                     y_c = random.randint(208-25,300)#y_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
@@ -303,10 +303,10 @@ class Seeing():
                     print("input1", input1.requires_grad)
 
                     #forward
-                    rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(device)
-                    prediction,feature_out = model(torch.clamp(input1+rn_noise,0,1), CUDA)
-                    prediction_target,feature_target = model(torch.clamp(input2+rn_noise,0,1), CUDA)
-                    det_loss, loss_dis, satur_loss, ind_nz= get_loss(prediction, adv_label,ori_index,input1,map_resize)
+                    rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
+                    prediction,feature_out = self.model(torch.clamp(input1+rn_noise,0,1), self.config.CUDA)
+                    prediction_target,feature_target = self.model(torch.clamp(input2+rn_noise,0,1), self.config.CUDA)
+                    det_loss, loss_dis, satur_loss, ind_nz= get_loss(self.config.device, prediction, adv_label,ori_index,input1,map_resize)
                     fir_loss = get_feature_dist(start_x,end_x,start_y,end_y,feature_out,feature_target) 
                     dist_loss = torch.dist(patch_fix, original_stop0, 2)
                     
@@ -407,15 +407,15 @@ class Seeing():
 
                     if j%5 == 0:
                         iteration = jsteps * i + j
-                        writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
-                        writer.add_scalar('misc/epoch', i, iteration)
-    #                     writer.add_scalar('misc/accumulated_gradient', grad_sum, iteration)
+                        self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('misc/epoch', i, iteration)
+    #                     self.writer.add_scalar('misc/accumulated_gradient', grad_sum, iteration)
                         
     #                     if(addweight_transform == "False"):
     #                         writer.add_image('misc/patch_fix', patch_fix.squeeze(), iteration) 
@@ -613,7 +613,7 @@ def write_archor(x, results):
     return img
 
 #get_loss_disappear
-def get_loss(prediction,adv_label,ori_index,img_adv,map_bounding):
+def get_loss(device, prediction,adv_label,ori_index,img_adv,map_bounding):
     ind_nz = get_ind(prediction, ori_index)
     loss_disappear= get_loss_disappear(prediction,ind_nz,adv_label)
     #    print('loss_creation:',loss_creation)
