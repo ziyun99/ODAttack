@@ -289,7 +289,7 @@ class Shapeshifter(object):
                 # Run summaries as necessary
                 if self.config.logdir and step % self.config.save_checkpoint_every == 0:
                     self.log.debug("Saving checkpoint")
-                    saver.save(sess, self.config.logdir + '/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
+                    self.saver.save(sess, self.config.logdir + '/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
 
                 if step % self.config.save_texture_every == 0 and self.test_writer is not None:
                     self.log.debug("Writing texture summary")
