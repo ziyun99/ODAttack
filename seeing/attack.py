@@ -328,34 +328,34 @@ class Seeing():
                     
                     loss = det_loss
                     
-                    if fir_flag:
-                        adap=fir_p*float(det_loss.data/(1/fir_loss.data))
-                        loss=det_loss+adap*(1/fir_loss)
+                    if self.config.fir_flag:
+                        adap = self.config.fir_p*float(det_loss.data/(1/fir_loss.data))
+                        loss = det_loss + adap*(1/fir_loss)
                         print('adap:', adap)
                         print('1/fir_loss:', 1/fir_loss)
                         print('loss2:', loss)
     
-                    if dist_flag:
-                        adap=dist_p*float(det_loss.data/dist_loss.data)
-                        loss=loss+adap*(dist_loss)
+                    if self.config.dist_flag:
+                        adap = self.config.dist_p*float(det_loss.data/dist_loss.data)
+                        loss = loss + adap*(dist_loss)
                         print('adap:', adap)           
                         print('loss3:', loss)
                 
-                    if tv_flag:
-                        adap=tv_p*float(det_loss.data/tv_loss.data)
-                        loss=loss+adap*(tv_loss)
+                    if self.config.tv_flag:
+                        adap = self.config.tv_p*float(det_loss.data/tv_loss.data)
+                        loss = loss + adap*(tv_loss)
                         print('adap:', adap)           
                         print('loss4:', loss)
                     
-                    if nps_flag:
-                        adap=nps_p*float(det_loss.data/nps_loss.data)
-                        loss=loss+adap*(nps_loss)
+                    if self.config.nps_flag:
+                        adap = self.config.nps_p*float(det_loss.data/nps_loss.data)
+                        loss = loss + adap*(nps_loss)
                         print('adap:', adap)           
                         print('loss5:', loss)
                                     
-                    if satur_flag:
-                        adap=satur_p*float(det_loss.data/satur_loss.data)
-                        loss=loss+adap*(satur_loss)
+                    if self.config.satur_flag:
+                        adap = self.config.satur_p*float(det_loss.data/satur_loss.data)
+                        loss = loss + adap*(satur_loss)
                         print('adap:', adap)           
                         print('loss6:', loss)
                         
