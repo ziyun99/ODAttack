@@ -45,6 +45,18 @@ class BaseConfig(object):
         self.CUDA = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.CUDA else "cpu")
         
+        #params
+        self.fir_p = 0.3
+        self.dist_p = 1.0
+        self.tv_p = 0.9
+        self.nps_p = 0.5
+        self.satur_p = 0.5
+        self.fir_flag = False
+        self.dist_flag = True
+        self.tv_flag = True
+        self.nps_flag = False
+        self.satur_flag = True
+
 class Seeing(BaseConfig):
     def __init__(self):
         super().__init__()
