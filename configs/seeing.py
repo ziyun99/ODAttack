@@ -17,6 +17,7 @@ class BaseConfig(object):
         self.path = os.path.join(os.getcwd(),'seeing/')
         self.out_path = os.path.join(os.getcwd(),'seeing/output/')
         self.logdir = os.path.join(self.path,"logdir/")
+        self.name = None
         
         # main parameters in AE generation
         self.session_name = time.strftime("%Y%m%d-%H%M%S")
@@ -61,10 +62,12 @@ class BaseConfig(object):
         self.optimizers = ["fgsm, adam"]
         self.optimizer = self.optimizers[0]
         
+        self.ntests = 1000
+        
 class Seeing(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.exp = "adam" + "_batch" + "_dist"
+        self.name = "adam" + "_batch" + "_dist"
 
 
 custom_configs = {
