@@ -16,6 +16,7 @@ class BaseConfig(object):
         self.attack_class = "Seeing"
         self.path = os.path.join(os.getcwd(),'seeing/')
         self.out_path = os.path.join(os.getcwd(),'seeing/output/')
+        self.logdir = os.path.join(self.path,"logdir/")
         
         # main parameters in AE generation
         self.session_name = time.strftime("%Y%m%d-%H%M%S")
@@ -29,7 +30,7 @@ class BaseConfig(object):
         self.stop_dir = os.path.join(self.path,"imgs/stop/")    #Image / Directory containing stop signs to generate AE
         self.bg_dir = os.path.join(self.path,"imgs/bg/road/")   #Image / Directory containing backgrounds to generate AE
         self.output_dir = os.path.join(self.path,"output/batch/")   #Image / Directory to store AE generated
-    
+        
         #detection parameters
         self.bs = 1     # Batch size
         self.confidence = 0.5
@@ -45,18 +46,6 @@ class BaseConfig(object):
         self.CUDA = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.CUDA else "cpu")
         
-        #params
-        self.fir_p = 0.3
-        self.dist_p = 1.0
-        self.tv_p = 0.9
-        self.nps_p = 0.5
-        self.satur_p = 0.5
-        self.fir_flag = False
-        self.dist_flag = True
-        self.tv_flag = True
-        self.nps_flag = False
-        self.satur_flag = True
-
 class Seeing(BaseConfig):
     def __init__(self):
         super().__init__()
