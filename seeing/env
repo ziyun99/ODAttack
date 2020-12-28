@@ -55,11 +55,45 @@ conda install pillow, lxml, jupyter, matplotlib, opencv, cython
 ### How to open Jupyter Notebook in browser ###
 conda activate tf_gpu
 jupyter notebook --no-browser --port=8889 --ip=0.0.0.0
-ssh -L 8080:gemini1:8889 ziyun@gemini1
-http://localhost:8080
+ssh -L 8889:gemini1:8889 ziyun@gemini1   #ssh -L 8889:gem1:8889 ziyun@10.215.37.33
+http://localhost:8889
 
 
 ### Open Tensorboard in browser
-tensorboard --host 0.0.0.0 --port 8888 --logdir logdir
-ssh -L 8888:gemini1:8888 ziyun@gemini1
-http://localhost:8888
+tensorboard --host 0.0.0.0 --port 8080 --logdir logdir
+ssh -L 8080:gemini1:8080 ziyun@gemini1
+http://localhost:8080
+
+
+################ Create environment
+conda update -n base -c defaults conda
+conda create -n ODAttack python=3.6 tensorflow-gpu==1.15
+conda activate ODAttack
+pip install torch torchvision  #1.7.1 #0.8.2
+conda install -c conda-forge opencv matplotlib
+conda install pandas
+pip install opencv, kornia, tqdm, future, xmltodict, tensorboardX
+
+pip install pipenv
+cd ODAttack/shapeshifter/
+cp *.diff Makefile Pipfile Pipfile.lock ..
+cd ..
+make deps
+pipenv run bash
+pip install ipykernel wrapt
+exit
+# make 2d_stopsign_targeted_attack
+# cp -r models/ shapeshifter/. 
+rm *.diff Makefile Pipfile Pipfile.lock
+
+## Shapeshifter
+pipenv run python main.py shapeshifter stop_t
+
+## invisible: python attack_model.py -fromfile data_sampling -frommaskfile test/EOTB.xml
+python main.py invisible odd
+
+## Fooling: python train_patch.py paper_obj
+python main.py fooling paper_obj
+
+## seeing:
+python main.py seeing seeing
