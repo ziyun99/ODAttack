@@ -32,10 +32,6 @@ from helper.patch2 import  addweight_transform_multiple, perspective_transform_m
 from helper.preprocess import prep_image, inp_to_image
 from helper.darknet4 import Darknet
 
-from tqdm import tqdm
-import gc
-import matplotlib.pyplot as plt
-from torchvision import transforms
 from tensorboardX import SummaryWriter
 import subprocess
 
@@ -85,15 +81,15 @@ class Seeing():
         self.model.to(self.config.device)
         self.model.eval() #Set the model in evaluation mode
 
-        self.num_classes = 80
         self.classes = load_classes(self.config.classes)
+        self.num_classes = len(self.classes)
 
     def attack(self):
-#         img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
-#         prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
+        # img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+        # prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
         ori_index = 11
-#         ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
-#         first_index = ind_nz_out[0]
+        # ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
+        # first_index = ind_nz_out[0]
 
         adv_label = [1 if i == 11 else 0 for i in range(80)] #stop sign=11,traffic_light=9
         adv_label = np.array(adv_label)
@@ -105,15 +101,15 @@ class Seeing():
         e = time.time()
         print("time_taken: ", str(e-s))
         
-        save_img(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
-        det_and_save_img(input1, os.path.join(self.config.out_path, 'final/adv_img'))
+        # save_img(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
+        # det_and_save_img(input1, os.path.join(self.config.out_path, 'final/adv_img'))
 
         print("Done and exit")
                           
     def get_adv_episilon(self, adv_label, ori_index):
         self.writer = self.init_tensorboard()
   
-        text = "Experiment: " + self.config.exp + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
+        text = "Experiment: " + self.config.name + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
         self.writer.add_text('param', text, 0) 
 
         # x_c=100
@@ -127,7 +123,7 @@ class Seeing():
         original_stop0 = original_stop
         
         #pole
-        # patch_pole=torch.zeros(3,27,201).to(device)
+        # patch_pole=torch.zeros(3,27,201).to(self.config.device)
         ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
 
         #patch_fix
@@ -294,8 +290,8 @@ class Seeing():
                     rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
                     prediction,feature_out = self.model(torch.clamp(input1+rn_noise,0,1), self.config.CUDA)
                     prediction_target,feature_target = self.model(torch.clamp(input2+rn_noise,0,1), self.config.CUDA)
-                    det_loss, loss_dis, satur_loss, ind_nz= get_loss(self.config.device, prediction, adv_label,ori_index,input1,map_resize)
-                    fir_loss = get_feature_dist(start_x,end_x,start_y,end_y,feature_out,feature_target) 
+                    det_loss, loss_dis, satur_loss, ind_nz= self.get_loss(self.config.device, prediction, adv_label,ori_index,input1,map_resize)
+                    fir_loss = self.get_feature_dist(start_x,end_x,start_y,end_y,feature_out,feature_target) 
                     dist_loss = torch.dist(patch_fix, original_stop0, 2)
                     
                     tvcomp1 = torch.sum(torch.abs(patch_four[:, :, 1:] - patch_four[:, :, :-1]+0.000001),0)
@@ -376,7 +372,7 @@ class Seeing():
                         if(perspective == 1):
                            perspective = 0
                            grad_resize1 = inverse_perspective_transform(grad_resize1,org,dst)
-                        grad_resize1 = torch.from_numpy(grad_resize1.transpose(2,0,1)).to(device)
+                        grad_resize1 = torch.from_numpy(grad_resize1.transpose(2,0,1)).to(self.config.device)
                         if j==0:
                            grad_resize = grad_resize1          
                         else:
@@ -445,7 +441,7 @@ class Seeing():
                     patch_f = patch_four
 
                     #random original _stop
-                    original_stop = get_random_stop_ori(imlist_stop).to(device)
+                    original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
                     original_stop = original_stop[0, :, :, :]
                     patch_fix = original_stop * map_4_stop + patch_four
                     patch_fix = torch.clamp(patch_fix, 0, 1)
@@ -498,7 +494,7 @@ class Seeing():
                 
                 
                 if i > 0 and i % 250 == 0:
-                    suc_rate, suc_step, total_frames = yolo_test(1000, copy.deepcopy(patch_four))
+                    suc_rate, suc_step, total_frames = self.yolo_test(self.config.ntests, copy.deepcopy(patch_four))
                     print("suc_rate, suc_step, total_frames", suc_rate, suc_step, total_frames)
                     
                 torch.cuda.empty_cache()
@@ -512,10 +508,10 @@ class Seeing():
                     self.writer.add_scalar('avg/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
                     self.writer.add_scalar('avg/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
 
-    #                 self.writer.add_scalar('misc/learning_rate', epsilon, i)
+                    # self.writer.add_scalar('misc/learning_rate', epsilon, i)
                     self.writer.add_scalar('misc/duration', round(t, 3), i)
                     self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
-#                     self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
+                    # self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
                     self.writer.add_image('adv_stop', patch_fix.squeeze(), i)
                     self.writer.add_image('patch', patch_f.squeeze(), i)
                     self.writer.add_image('adv_img', input1.squeeze(), i)
@@ -528,26 +524,24 @@ class Seeing():
         return patch_fix, input1
         #return patch_fix,output_adv
 
-    def get_test_input(self, input_dim, CUDA, img):
-        img = cv2.imread(img)
-        # img = cv2.imread("det/stop_sign.png")
+    def get_test_input(self, input_dim, CUDA, path):
+        img = cv2.imread(path)
         img = cv2.resize(img, (input_dim, input_dim))
 
         img_ =  img.transpose((2,0,1))
         img_ = img_[np.newaxis,:,:,:]/255.0
         img_ = torch.from_numpy(img_).float()
         img_ = Variable(img_)
-
-    #     if CUDA:
         img_ = img_.to(self.config.device)
         return img_
 
-    def init_tensorboard(self,name=None):
-    #     subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir ./runs'])
-    #     attack_name = "adam" + "_batch" + "_dist" + "test"
+    def init_tensorboard(self):
+        # subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir={self.config.logdir}'])
         time_str = time.strftime("%Y%m%d-%H%M%S")
-        return SummaryWriter(f'{self.config.logdir}/{time_str}_{self.config.exp}')
-    #     return SummaryWriter(comment=attack_name)
+        if self.config.name is not None:
+            return SummaryWriter(f'{self.config.logdir}/{time_str}_{self.config.name}')
+        else:
+            return SummaryWriter(f'{self.config.logdir}/{time_str}')
 
     def get_stop_patch(self, input_dim=201):
         # images='stop/'
@@ -606,425 +600,273 @@ class Seeing():
         pa = torch.from_numpy(printability_array)
         return pa
 
-def write_archor(x, results):
-    c1 = tuple(x[1:3].int())
-    c2 = tuple(x[3:5].int())
-    img = results
-    cls = int(x[7])
-    label = "{0}".format(classes[cls])
-    colors = pkl.load(open("helper/pallete", "rb"))
-    color = random.choice(colors)
-    cv2.rectangle(img, c1, c2,color, 1)
-    t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1 , 1)[0]
-    c2 = c1[0] + t_size[0] + 3, c1[1] + t_size[1] + 4
-    cv2.rectangle(img, c1, c2,color, -1)
-    cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1)
-    return img
+    def write_archor(self, x, results):
+        c1 = tuple(x[1:3].int())
+        c2 = tuple(x[3:5].int())
+        img = results
+        cls = int(x[7])
+        label = "{0}".format(self.classes[cls])
+        colors = pkl.load(open("helper/pallete", "rb"))
+        color = random.choice(colors)
+        cv2.rectangle(img, c1, c2,color, 1)
+        t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1 , 1)[0]
+        c2 = c1[0] + t_size[0] + 3, c1[1] + t_size[1] + 4
+        cv2.rectangle(img, c1, c2,color, -1)
+        cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1)
+        return img
 
-#get_loss_disappear
-def get_loss(device, prediction,adv_label,ori_index,img_adv,map_bounding):
-    ind_nz = get_ind(prediction, ori_index)
-    loss_disappear= get_loss_disappear(prediction,ind_nz,adv_label)
-    #    print('loss_creation:',loss_creation)
-    #   print('loss_index',loss_index)
-    #loss_smoothness=get_loss_smoothness(img_adv,map_bounding)
-    loss_smoothness=0#get_loss_median(img_adv,map_bounding)
-    loss_saturation=get_loss_saturation(img_adv,map_bounding, device)
-    loss=loss_disappear#+loss_saturation*(1/5000)#+loss_smoothness*(1/1000)#100*100..20000  loss_smoothness*(1/10000)+
-    return  loss,loss_disappear,loss_saturation,ind_nz
+    def det_and_save_img_i(self, img , i, path):
+        prediction,feature_out = self.model(img , CUDA)
+        output = write_results(self.config.device, prediction.data, self.config.confidence, self.num_classes, nms = True, nms_conf = nms_thesh)#final_output,[:,8] 8=input_img_num,xc,yc,width,height,confidence,confidence_class,class
 
-def get_feature_loss(start_x,end_x,start_y,end_y,feature_out,feature_target):
-        feature0=feature_out[0]#208*208*64
-        feature1=feature_out[1]#104*104*128
-        feature2=feature_out[2]#52*52*256
-        feature3=feature_out[3]#26*26*512
-        feature4=feature_out[4]#13*13*1024
+        img_save=inp_to_image(img)
 
-        featuret0=feature_target[0].data#208*208*64
-        featuret1=feature_target[1].data#104*104*128
-        featuret2=feature_target[2].data#52*52*256
-        featuret3=feature_target[3].data#26*26*512
-        featuret4=feature_target[4].data#13*13*1024
+        cv2.imwrite(path+'/'+str(i)+'.png', img_save)
+        print("Saved img: ", path+'/'+str(i)+'.png')
 
-        start_fx=math.floor(start_x*(208/416))
-        end_fx=math.ceil(end_x*(208/416))
-        start_fx=np.clip(start_fx,0,207)
-        end_fx=np.clip(end_fx,0,207)
-        start_fy=math.floor(start_y*(208/416))
-        end_fy=math.ceil(end_y*(208/416))
-        start_fy=np.clip(start_fy,0,207)
-        end_fy=np.clip(end_fy,0,207)
-        # print(feature0.shape)
-        # print('start_fx:',start_fx)
-        # print('end_fx:',end_fx)
-        # print('start_fy:',start_fy)
-        # print('end_fy:',end_fy)
-        f0=feature0[0,:,start_fx:end_fx,start_fy:end_fy]
-        # print(f0.shape)
-        f0=torch.reshape(f0, [f0.shape[0]*f0.shape[1]*f0.shape[2]])
-        f0=torch.softmax(f0,0)
-        ft0=featuret0[0,:,start_fx:end_fx,start_fy:end_fy]
-        ft0=torch.reshape(ft0, [ft0.shape[0]*ft0.shape[1]*ft0.shape[2]])
-        ft0=torch.softmax(ft0,0)
-        loss0=torch.sum(torch.abs(f0-ft0))#/f0.shape[0]
+        img_draw= cv2.imread(path+'/'+str(i)+'.png')
+        out_save=list(map(lambda x: self.write_archor(x,img_draw), output))
+        cv2.imwrite(path+'_det/'+str(i)+'.png', img_draw)
+        print("Saved img: ", path+'_det/'+str(i)+'.png')
 
-        start_fx=math.floor(start_x*(104/416))
-        end_fx=math.ceil(end_x*(104/416))
-        start_fx=np.clip(start_fx,0,103)
-        end_fx=np.clip(end_fx,0,103)
-        start_fy=math.floor(start_y*(104/416))
-        end_fy=math.ceil(end_y*(104/416))
-        start_fy=np.clip(start_fy,0,103)
-        end_fy=np.clip(end_fy,0,103)
-
-        f1=feature1[0,:,start_fx:end_fx,start_fy:end_fy]
-        f1=torch.reshape(f1, [f1.shape[0]*f1.shape[1]*f1.shape[2]])
-        f1=torch.softmax(f1,0)
-        ft1=featuret1[0,:,start_fx:end_fx,start_fy:end_fy]
-        ft1=torch.reshape(ft1, [ft1.shape[0]*ft1.shape[1]*ft1.shape[2]])
-        ft1=torch.softmax(ft1,0)
-        loss1=torch.sum(torch.abs(f1-ft1))#/f1.shape[0]
-
-        start_fx=math.floor(start_x*(52/416))
-        end_fx=math.ceil(end_x*(52/416))
-        start_fx=np.clip(start_fx,0,51)
-        end_fx=np.clip(end_fx,0,51)
-        start_fy=math.floor(start_y*(52/416))
-        end_fy=math.ceil(end_y*(52/416))
-        start_fy=np.clip(start_fy,0,51)
-        end_fy=np.clip(end_fy,0,51)
-
-        # print(feature2.shape)
-        # print('start_fx:',start_fx)
-        # print('end_fx:',end_fx)
-        # print('start_fy:',start_fy)
-        # print('end_fy:',end_fy)
-
-        f2=feature2[0,:,start_fx:end_fx,start_fy:end_fy]
-        # print(f2.shape)
-        f2=torch.reshape(f2, [f2.shape[0]*f2.shape[1]*f2.shape[2]])
-        f2=torch.softmax(f2,0)
-        ft2=featuret2[0,:,start_fx:end_fx,start_fy:end_fy]
-        ft2=torch.reshape(ft2, [ft2.shape[0]*ft2.shape[1]*ft2.shape[2]])
-        ft2=torch.softmax(ft2,0)
-        loss2=torch.sum(torch.abs(f2-ft2))#/f2.shape[0]
-
-        start_fx=math.floor(start_x*(26/416))
-        end_fx=math.ceil(end_x*(26/416))
-        start_fx=np.clip(start_fx,0,25)
-        end_fx=np.clip(end_fx,0,25)
-        start_fy=math.floor(start_y*(26/416))
-        end_fy=math.ceil(end_y*(26/416))
-        start_fy=np.clip(start_fy,0,25)
-        end_fy=np.clip(end_fy,0,25)
-
-        f3=feature3[0,:,start_fx:end_fx,start_fy:end_fy]
-        f3=torch.reshape(f3, [f3.shape[0]*f3.shape[1]*f3.shape[2]])
-        f3=torch.softmax(f3,0)
-        ft3=featuret3[0,:,start_fx:end_fx,start_fy:end_fy]
-        ft3=torch.reshape(ft3, [ft3.shape[0]*ft3.shape[1]*ft3.shape[2]])
-        ft3=torch.softmax(ft3,0)
-        loss3=torch.sum(torch.abs(f3-ft3))#/f3.shape[0]
-
-        start_fx=math.floor(start_x*(13/416))
-        end_fx=math.ceil(end_x*(13/416))
-        start_fx=np.clip(start_fx,0,12)
-        end_fx=np.clip(end_fx,0,12)
-        start_fy=math.floor(start_y*(13/416))
-        end_fy=math.ceil(end_y*(13/416))
-        start_fy=np.clip(start_fy,0,12)
-        end_fy=np.clip(end_fy,0,12)
-
-        f4=feature4[0,:,start_fx:end_fx,start_fy:end_fy]
-        f4=torch.reshape(f4, [f4.shape[0]*f4.shape[1]*f4.shape[2]])
-        #  f4=torch.softmax(f4,0)
-        f4=f4/torch.max(torch.abs(f4))
-        ft4=featuret4[0,:,start_fx:end_fx,start_fy:end_fy]
-        ft4=torch.reshape(ft4, [ft4.shape[0]*ft4.shape[1]*ft4.shape[2]])
-        #  ft4=torch.softmax(ft4,0)
-        ft4=ft4/torch.max(torch.abs(ft4))
-        loss4=torch.sum(torch.abs(f4-ft4))#/f4.shape[0]
-        loss=50/(loss2+loss3+loss4+0.000001)#*(1/5)
-        return loss
-
-def get_feature_dist(start_x,end_x,start_y,end_y,feature_out,feature_target):
-        dist=0
-        for i in range(len(feature_out)):
-            size = feature_out[i].shape[2]
-            start_fx=math.floor(start_x*(size/416))
-            end_fx=math.ceil(end_x*(size/416))
-            start_fx=np.clip(start_fx,0,size-1)
-            end_fx=np.clip(end_fx,0,size-1)
-            start_fy=math.floor(start_y*(size/416))
-            end_fy=math.ceil(end_y*(size/416))
-            start_fy=np.clip(start_fy,0,size-1)
-            end_fy=np.clip(end_fy,0,size-1)
-
-            f_sa=feature_out[i][0,:,start_fx:end_fx,start_fy:end_fy]
-            f_st=feature_target[i][0,:,start_fx:end_fx,start_fy:end_fy]
-           
-            #mean
-            f_samean = torch.sum(torch.abs(f_sa),2)
-            f_samean = torch.sum(f_samean,1)/(size*size)
-            f_stmean = torch.sum(torch.abs(f_st),2)
-            f_stmean = torch.sum(f_stmean,1)/(size*size)
-            # generalization
-            cores=len(f_stmean)
-            # print(cores)
-            # f_stmean=f_stmean/torch.max(f_stmean)
-            # print(f_stmean.shape)
-            f_stmean=torch.softmax(f_stmean,0)
-            # f_samean=f_samean/torch.max(f_samean)
-            f_samean=torch.softmax(f_samean,0)
-            dist_one=torch.sum(torch.abs(f_stmean-f_samean)**2)#/cores
-            dist=dist+dist_one
+    def save_img_i(self, img,i,path):
+        img_save = inp_to_image(img)
+        cv2.imwrite(path+str(i)+'.png', img_save)
+        print("Saved img: ", path+str(i)+'.png')
             
-        return dist
+    #get_loss_disappear
+    def get_loss(self, device, prediction,adv_label,ori_index,img_adv,map_bounding):
+        ind_nz = get_ind(prediction, ori_index)
+        loss_disappear= get_loss_disappear(prediction,ind_nz,adv_label)
+        #    print('loss_creation:',loss_creation)
+        #   print('loss_index',loss_index)
+        #loss_smoothness=get_loss_smoothness(img_adv,map_bounding)
+        loss_smoothness=0#get_loss_median(img_adv,map_bounding)
+        loss_saturation=get_loss_saturation(img_adv,map_bounding, device)
+        loss=loss_disappear#+loss_saturation*(1/5000)#+loss_smoothness*(1/1000)#100*100..20000  loss_smoothness*(1/10000)+
+        return  loss,loss_disappear,loss_saturation,ind_nz
 
-def det_and_save_img_i(img,i,path):
-    prediction,feature_out = model(img , CUDA)
-    output = write_results(device, prediction.data, confidence, num_classes, nms = True, nms_conf = nms_thesh)#final_output,[:,8] 8=input_img_num,xc,yc,width,height,confidence,confidence_class,class
+    def get_feature_dist(self, start_x,end_x,start_y,end_y,feature_out,feature_target):
+            dist=0
+            for i in range(len(feature_out)):
+                size = feature_out[i].shape[2]
+                start_fx=math.floor(start_x*(size/416))
+                end_fx=math.ceil(end_x*(size/416))
+                start_fx=np.clip(start_fx,0,size-1)
+                end_fx=np.clip(end_fx,0,size-1)
+                start_fy=math.floor(start_y*(size/416))
+                end_fy=math.ceil(end_y*(size/416))
+                start_fy=np.clip(start_fy,0,size-1)
+                end_fy=np.clip(end_fy,0,size-1)
 
-    img_save=inp_to_image(img)
-
-    cv2.imwrite(path+'/'+str(i)+'.png', img_save)
-    print("Saved img: ", path+'/'+str(i)+'.png')
-
-    img_draw= cv2.imread(path+'/'+str(i)+'.png')
-    out_save=list(map(lambda x: write_archor(x,img_draw), output))
-    cv2.imwrite(path+'_det/'+str(i)+'.png', img_draw)
-    print("Saved img: ", path+'_det/'+str(i)+'.png')
-
-def det_and_save_img(img, path):
-    prediction,feature_out = model(img , CUDA)
-    output = write_results(device, prediction.data, confidence, num_classes, nms = True, nms_conf = nms_thesh)#final_output,[:,8] 8=input_img_num,xc,yc,width,height,confidence,confidence_class,class
-
-    img_save=inp_to_image(img)
-
-    cv2.imwrite(path+'.png', img_save)
-    print("Saved img: ", path+'.png')
-
-    img_draw= cv2.imread(path+'.png')
-    out_save=list(map(lambda x: write_archor(x,img_draw), output))
-    cv2.imwrite(path+'_det'+'.png', img_draw)
-    print("Saved img: ", path+'_det'+'.png')
-
-def save_img_i(img,i,path):
-    img_save = inp_to_image(img)
-    cv2.imwrite(path+str(i)+'.png', img_save)
-    print("Saved img: ", path+str(i)+'.png')
-   
-def save_img(img, path):
-    img_save = inp_to_image(img)
-    cv2.imwrite(path +'.png', img_save)
-    print("Saved img: ", path +'.png')
-
-def get_character_input(input_dim, character_path):
-    img = cv2.imread(character_path)
-    img = cv2.resize(img, (input_dim, input_dim))
-    img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
-    img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
-    return img_out.to(device)
-
-def get_ind2(prediction,ori_index):
-    conf_mask = ((prediction[:,:,4] > confidence)).float().unsqueeze(2)#confidence>0.5
-    max_a,max_b=torch.max(prediction[:,:,5:5+ num_classes],2)
-    conf_mask2 = (max_b ==ori_index).float().unsqueeze(2)#1=bicycle,11=stop_sign,9=traffic_light
-    prediction = prediction*conf_mask2
-    prediction=prediction*conf_mask
-    ind_nz = torch.nonzero(prediction[0,:,4])
-    if ind_nz.shape[0]==0:
-        return  0
-    else:
-        return 1
-
-def yolo_test(num_test, patch_test):
-    patch_test=Variable(patch_test,requires_grad=False)
-    start_x = 200
-    start_y = 100
-    width = 201
-    height = 201
-    radius=(width-1)/2
-
-    x_c=100
-    y_c=150
-    
-    width_pole=201
-    height_pole=27
-
-    #img_ori
-    img_ori=get_test_input_ori(inp_dim, CUDA)
-
-    #ori_stop
-    original_stop,map_4_patches,map_4_stop,patch_four=get_stop_patch(input_dim=201)
-    
-    #pole
-    patch_pole=torch.zeros(3,27,201).to(device)
-    ori_pole=get_pole('imgs/pole/pole.jpg')
-
-    #patch_fix
-    patch_fix=torch.zeros(3,201,201).to(device)
-#     patch_fix[:,:,:]=stop_adv[:,:,:]
-    
-    #map
-    map_ori=torch.zeros(1,3,416,416).to(device)
-    map_resize=torch.zeros(1,3,416,416).to(device)# the map of all three patches
-    
-    #img_input
-    img_input=torch.zeros(1,3,416,416).to(device)
-    img_input2=torch.zeros(1,3,416,416).to(device)
-
-    #perspective
-    ori_stop_perspective=torch.zeros(3,width,width).to(device)
-    ori_stop2=torch.zeros(3,201,201).to(device)
-    ori_stop2_pers=torch.zeros(3,201,201).to(device)
-
-    #patch
-    patch_transform=img_ori[ 0,:, start_x:start_x+width,start_y:start_y+height]
-    patch_pole_transform=torch.zeros(3,27,201).to(device)
-
-    suc_step=0
-    total_frames = 0
-    try: 
-        for i in range(num_test):
-
-            # get_random_stop_ori # cut out the patch and paste it to different stop sign
-            original_stop = get_random_stop_ori(imlist_stop).to(device)
-            original_stop = original_stop[0, :, :, :]
-            patch_f = patch_test * map_4_patches
-            patch_fix = original_stop * map_4_stop + patch_f
-            patch_fix = torch.clamp(patch_fix, 0, 1)
-
-            if i%2==0:
-                patch_transform[:,:,:],ori_stop2[:,:,:] = addweight_transform_multiple(patch_fix[:,:,:],original_stop[:,:,:])
-                patch_pole_transform[:,:,:]=ori_pole[:,:,:]
-                patch_transform = torch.clamp(patch_transform, 0.000001, 0.999999)
-                ori_stop2 = torch.clamp(ori_stop2, 0.000001, 0.999999)
-            else:
-                # gamma_transform_multiple(patch_fix)
-                patch_transform[:,:,:] = patch_fix[:,:,:]
-                patch_pole_transform[:,:,:]=ori_pole[:,:,:]
-                ori_stop2[:,:,:]=original_stop[:,:,:]
-#             print("patch_transform", patch_transform.requires_grad)
-            angle = 1000 #random
-            if i % 3 == 0:
-                #perspective transform   
-                patch_transform,org,dst,angle=perspective_transform_multiple(patch_transform, set_angle=angle)
-                ori_stop_perspective,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(original_stop,True,angle)
-                ori_stop2_pers,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(ori_stop2,True,angle)
-            else:
-                ori_stop_perspective[:,:,:]=original_stop[:,:,:]
-                ori_stop2_pers[:,:,:]=ori_stop2[:,:,:]
-            #random background
-            img_ori = get_random_img_ori(imlist_back).to(device)
+                f_sa=feature_out[i][0,:,start_fx:end_fx,start_fy:end_fy]
+                f_st=feature_target[i][0,:,start_fx:end_fx,start_fy:end_fy]
             
-#             print("patch_transform", patch_transform.requires_grad)
-            if ((i+1)/2==0):
-                    ratio = random.uniform(0.2, 1)
-            else:
-                    ratio=random.uniform(0.2,0.5)
-
-            # x_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
-            x_c=random.randint(99,400-int(ratio*(100+201)))
-            #y_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
-            y_c=random.randint(208-25,300)
-            width_r=math.ceil(ratio*width)
-            height_r=math.ceil(ratio*width)
-            width_pole_r=math.ceil(ratio*width_pole)
-            height_pole_r=math.ceil(ratio*height_pole)
-            if(width_r%2==0):
-                width_r=width_r+1
-            if(height_r%2==0):
-                height_r=height_r+1
-            if(width_pole_r%2==0):
-                width_pole_r=width_pole_r+1
-            if(height_r%2==0):
-                width_pole_r=width_pole_r+1
-
-            #patch_resize=resize(stop+patch)
-            patch_resize=cv2.resize(patch_transform.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
-            #patch_pole_resize=resize(patch_pole)
-            patch_pole_resize=cv2.resize(patch_pole_transform.cpu().numpy().transpose(1,2,0) ,(height_pole_r,width_pole_r),cv2.INTER_CUBIC)
-            #ori_stop_resize=resize(original stop) just for the stop_4 to get four corners
-            ori_stop_resize=cv2.resize(ori_stop_perspective.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
-            ori_stop2_resize=cv2.resize(ori_stop2_pers.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
-
-            patch_resize=torch.from_numpy(patch_resize.transpose(2,0,1)).to(device)
-            patch_pole_resize=torch.from_numpy(patch_pole_resize.transpose(2,0,1)).to(device)
-            ori_stop_resize=torch.from_numpy(ori_stop_resize.transpose(2,0,1)).to(device)
-
-            ori_stop2_resize=torch.from_numpy(ori_stop2_resize.transpose(2,0,1)).to(device)
-
-            map_resize[:,:,:,:]=map_ori[:,:,:,:]
-            start_x=int(x_c-(width_r-1)/2)
-            end_x=int(x_c+(width_r-1)/2+1)
-            start_y=int(y_c-(height_r-1)/2)
-            end_y=int(y_c+(height_r-1)/2+1)
-            start_pole_y=int(y_c-(height_pole_r-1)/2)
-            end_pole_y=int(y_c+(height_pole_r-1)/2+1)
-            start_pole_x=int(x_c+(width_r-1)/2+1)
-            end_pole_x=int(x_c+(width_r-1)/2+width_pole_r+1)
-
-
-            img_input[:,:,:,:]=img_ori[:,:,:,:]
-            img_input2[:,:,:,:]=img_ori[:,:,:,:]
-
-            # get four corners of stop
-            stop_4=torch.sum(ori_stop_resize[:,:,:],0)
-            stop_4=(stop_4<0.1).float().unsqueeze(0)
-            stop_4=torch.cat((stop_4,stop_4,stop_4),0)
-            
-            # img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-            # add adv_stop and pole to background img
-            img_input[0,:,start_x:end_x,start_y:end_y]=patch_resize*(1-stop_4)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-            img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
-
-            img_input2[0,:,start_x:end_x,start_y:end_y]=ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-            img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
-
-            input1=Variable(img_input, requires_grad=True)
-            input2=Variable(img_input2, requires_grad=True)
-            
-            #forward
-            rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(device)
-            with torch.no_grad():
-                prediction, _ = model(torch.clamp(input1+rn_noise,0,1), CUDA)
-                prediction2, _ = model(torch.clamp(input2+rn_noise,0,1), CUDA)
-            detect=get_ind2(prediction,ori_index)
-            detect2=get_ind2(prediction2,ori_index)
-            
-            
-            is_success = 0
-            if detect2 != 0:
-                total_frames += 1
-                if detect==0:
-#                     print("Success")
-                    suc_step += 1
-                    is_success = 1
-                    # det_and_save_img_i(input1, i, output_dir + "adv_img", is_success) # Adversarial Example: woth background and adversarial stop sign
-                    # det_and_save_img_i(input2, i, output_dir + "ori_img", is_success)
-#                 else:
-#                     print("Not success")
-#             else:
-#                 print("Not detected in original image.")
-            if total_frames > 0: 
-                suc_rate = suc_step/total_frames
+                #mean
+                f_samean = torch.sum(torch.abs(f_sa),2)
+                f_samean = torch.sum(f_samean,1)/(size*size)
+                f_stmean = torch.sum(torch.abs(f_st),2)
+                f_stmean = torch.sum(f_stmean,1)/(size*size)
+                # generalization
+                cores=len(f_stmean)
+                # print(cores)
+                # f_stmean=f_stmean/torch.max(f_stmean)
+                # print(f_stmean.shape)
+                f_stmean=torch.softmax(f_stmean,0)
+                # f_samean=f_samean/torch.max(f_samean)
+                f_samean=torch.softmax(f_samean,0)
+                dist_one=torch.sum(torch.abs(f_stmean-f_samean)**2)#/cores
+                dist=dist+dist_one
                 
-            if i % 100 == 0:  
-                print("i:",i)
-                print('success_rate:', suc_rate)
-#                 output_dir = "./output/yolo_test/"
-#                 det_and_save_img_i(input1, i, output_dir + "adv_img") # Adversarial Example: woth background and adversarial stop sign
-#                 det_and_save_img_i(input2, i, output_dir + "ori_img")
-                # save_img_i(patch_resize, i, output_dir + "debug/patch_resize/")
-                # save_img_i(patch_pole_resize, i, output_dir + "debug/patch_pole_resize/")
-                # save_img_i(stop_4, i, output_dir + "debug/stop_4/")
-                # save_img_i(img_ori, i, output_dir + "debug/img_ori/")
-    
-    except KeyboardInterrupt:
-        print('KeyboardInterrupt')
-        return suc_rate, suc_step, total_frames
+            return dist
 
-    return suc_rate, suc_step, total_frames
+    def yolo_test(self, num_test, patch_test):
+        patch_test=Variable(patch_test,requires_grad=False)
+        start_x = 200
+        start_y = 100
+        width = 201
+        height = 201
+        radius=(width-1)/2
+
+        x_c=100
+        y_c=150
+        
+        width_pole=201
+        height_pole=27
+
+        #img_ori
+        img_ori= self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+
+        #ori_stop
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201)
+        
+        #pole
+        patch_pole=torch.zeros(3,27,201).to(self.config.device)
+        ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
+
+        #patch_fix
+        patch_fix=torch.zeros(3,201,201).to(self.config.device)
+        # patch_fix[:,:,:]=stop_adv[:,:,:]
+        
+        #map
+        map_ori=torch.zeros(1,3,416,416).to(self.config.device)
+        map_resize=torch.zeros(1,3,416,416).to(self.config.device)# the map of all three patches
+        
+        #img_input
+        img_input=torch.zeros(1,3,416,416).to(self.config.device)
+        img_input2=torch.zeros(1,3,416,416).to(self.config.device)
+
+        #perspective
+        ori_stop_perspective=torch.zeros(3,width,width).to(self.config.device)
+        ori_stop2=torch.zeros(3,201,201).to(self.config.device)
+        ori_stop2_pers=torch.zeros(3,201,201).to(self.config.device)
+
+        #patch
+        patch_transform=img_ori[ 0,:, start_x:start_x+width,start_y:start_y+height]
+        patch_pole_transform=torch.zeros(3,27,201).to(self.config.device)
+
+        suc_step=0
+        total_frames = 0
+        try: 
+            for i in range(num_test):
+
+                # get_random_stop_ori # cut out the patch and paste it to different stop sign
+                original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
+                original_stop = original_stop[0, :, :, :]
+                patch_f = patch_test * map_4_patches
+                patch_fix = original_stop * map_4_stop + patch_f
+                patch_fix = torch.clamp(patch_fix, 0, 1)
+
+                if i%2==0:
+                    patch_transform[:,:,:],ori_stop2[:,:,:] = addweight_transform_multiple(patch_fix[:,:,:],original_stop[:,:,:])
+                    patch_pole_transform[:,:,:]=ori_pole[:,:,:]
+                    patch_transform = torch.clamp(patch_transform, 0.000001, 0.999999)
+                    ori_stop2 = torch.clamp(ori_stop2, 0.000001, 0.999999)
+                else:
+                    # gamma_transform_multiple(patch_fix)
+                    patch_transform[:,:,:] = patch_fix[:,:,:]
+                    patch_pole_transform[:,:,:]=ori_pole[:,:,:]
+                    ori_stop2[:,:,:]=original_stop[:,:,:]
+                # print("patch_transform", patch_transform.requires_grad)
+                angle = 1000 #random
+                if i % 3 == 0:
+                    #perspective transform   
+                    patch_transform,org,dst,angle=perspective_transform_multiple(patch_transform, set_angle=angle)
+                    ori_stop_perspective,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(original_stop,True,angle)
+                    ori_stop2_pers,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(ori_stop2,True,angle)
+                else:
+                    ori_stop_perspective[:,:,:]=original_stop[:,:,:]
+                    ori_stop2_pers[:,:,:]=ori_stop2[:,:,:]
+                #random background
+                img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
+                
+                # print("patch_transform", patch_transform.requires_grad)
+                if ((i+1)/2==0):
+                        ratio = random.uniform(0.2, 1)
+                else:
+                        ratio=random.uniform(0.2,0.5)
+
+                # x_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
+                x_c=random.randint(99,400-int(ratio*(100+201)))
+                #y_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
+                y_c=random.randint(208-25,300)
+                width_r=math.ceil(ratio*width)
+                height_r=math.ceil(ratio*width)
+                width_pole_r=math.ceil(ratio*width_pole)
+                height_pole_r=math.ceil(ratio*height_pole)
+                if(width_r%2==0):
+                    width_r=width_r+1
+                if(height_r%2==0):
+                    height_r=height_r+1
+                if(width_pole_r%2==0):
+                    width_pole_r=width_pole_r+1
+                if(height_r%2==0):
+                    width_pole_r=width_pole_r+1
+
+                #patch_resize=resize(stop+patch)
+                patch_resize=cv2.resize(patch_transform.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
+                #patch_pole_resize=resize(patch_pole)
+                patch_pole_resize=cv2.resize(patch_pole_transform.cpu().numpy().transpose(1,2,0) ,(height_pole_r,width_pole_r),cv2.INTER_CUBIC)
+                #ori_stop_resize=resize(original stop) just for the stop_4 to get four corners
+                ori_stop_resize=cv2.resize(ori_stop_perspective.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
+                ori_stop2_resize=cv2.resize(ori_stop2_pers.cpu().numpy().transpose(1,2,0) ,(width_r,height_r),cv2.INTER_CUBIC)
+
+                patch_resize=torch.from_numpy(patch_resize.transpose(2,0,1)).to(self.config.device)
+                patch_pole_resize=torch.from_numpy(patch_pole_resize.transpose(2,0,1)).to(self.config.device)
+                ori_stop_resize=torch.from_numpy(ori_stop_resize.transpose(2,0,1)).to(self.config.device)
+
+                ori_stop2_resize=torch.from_numpy(ori_stop2_resize.transpose(2,0,1)).to(self.config.device)
+
+                map_resize[:,:,:,:]=map_ori[:,:,:,:]
+                start_x=int(x_c-(width_r-1)/2)
+                end_x=int(x_c+(width_r-1)/2+1)
+                start_y=int(y_c-(height_r-1)/2)
+                end_y=int(y_c+(height_r-1)/2+1)
+                start_pole_y=int(y_c-(height_pole_r-1)/2)
+                end_pole_y=int(y_c+(height_pole_r-1)/2+1)
+                start_pole_x=int(x_c+(width_r-1)/2+1)
+                end_pole_x=int(x_c+(width_r-1)/2+width_pole_r+1)
+
+
+                img_input[:,:,:,:]=img_ori[:,:,:,:]
+                img_input2[:,:,:,:]=img_ori[:,:,:,:]
+
+                # get four corners of stop
+                stop_4=torch.sum(ori_stop_resize[:,:,:],0)
+                stop_4=(stop_4<0.1).float().unsqueeze(0)
+                stop_4=torch.cat((stop_4,stop_4,stop_4),0)
+                
+                # img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                # add adv_stop and pole to background img
+                img_input[0,:,start_x:end_x,start_y:end_y]=patch_resize*(1-stop_4)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
+
+                img_input2[0,:,start_x:end_x,start_y:end_y]=ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
+
+                input1=Variable(img_input, requires_grad=True)
+                input2=Variable(img_input2, requires_grad=True)
+                
+                #forward
+                rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
+                with torch.no_grad():
+                    prediction, _ = self.model(torch.clamp(input1+rn_noise,0,1), CUDA)
+                    prediction2, _ = self.model(torch.clamp(input2+rn_noise,0,1), CUDA)
+                detect=get_ind(prediction,ori_index)
+                detect2=get_ind(prediction2,ori_index)
+                
+                
+                is_success = 0
+                if detect2 != [0]:
+                    total_frames += 1
+                    if detect==[0]:
+                        # print("Success")
+                        suc_step += 1
+                        is_success = 1
+                        # det_and_save_img_i(input1, i, output_dir + "adv_img", is_success) # Adversarial Example: woth background and adversarial stop sign
+                        # det_and_save_img_i(input2, i, output_dir + "ori_img", is_success)
+                    # else:
+                        # print("Not success")
+                # else:
+                    # print("Not detected in original image.")
+                if total_frames > 0: 
+                    suc_rate = suc_step/total_frames
+                    
+                if i % 100 == 0:  
+                    print("i:",i)
+                    print('success_rate:', suc_rate)
+                    # output_dir = "./output/yolo_test/"
+                    # det_and_save_img_i(input1, i, output_dir + "adv_img") # Adversarial Example: woth background and adversarial stop sign
+                    # det_and_save_img_i(input2, i, output_dir + "ori_img")
+                    # save_img_i(patch_resize, i, output_dir + "debug/patch_resize/")
+                    # save_img_i(patch_pole_resize, i, output_dir + "debug/patch_pole_resize/")
+                    # save_img_i(stop_4, i, output_dir + "debug/stop_4/")
+                    # save_img_i(img_ori, i, output_dir + "debug/img_ori/")
+        
+        except KeyboardInterrupt:
+            print('KeyboardInterrupt')
+            return suc_rate, suc_step, total_frames
+
+        return suc_rate, suc_step, total_frames
 
 
