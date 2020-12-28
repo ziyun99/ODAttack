@@ -126,7 +126,16 @@ class Seeing():
         suc_rate = 0
         try: 
             for i in range(self.config.nepochs):
-                start = time.time()
+                epoch_start = time.time()
+                                    
+                epoch_total_loss = 0
+                epoch_det_loss = 0
+                epoch_fir_loss = 0
+                epoch_dist_loss = 0
+                epoch_tv_loss = 0
+                epoch_nps_loss = 0
+                epoch_satur_loss = 0
+                    
                 original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
                 original_stop = original_stop[0, :, :, :]
                 for j in range(self.config.batch_size):
@@ -302,6 +311,7 @@ class Seeing():
                     print('dist_loss:', dist_loss)
                     print('tv_loss:', tv_loss)
                     print('nps_loss:', nps_loss)
+                    print('satur_loss:', satur_loss)
                     
                     loss = det_loss
                     
@@ -374,35 +384,33 @@ class Seeing():
                         # print("After zero_grad: patch_four grad data: ", patch_four.grad.data)
                         # patch_four=patch_four*map_4_patches
                         patch_four.data.clamp_(0,1)       #keep patch in image range
-                                
-                    if j==0:
-                        epoch_total_loss = loss
-                        epoch_det_loss = det_loss
-                        epoch_fir_loss = fir_loss
-                        epoch_dist_loss = dist_loss
                     
-                    else:
-                        epoch_total_loss += loss
-                        epoch_det_loss += det_loss
-                        epoch_fir_loss += fir_loss
-                        epoch_dist_loss += dist_loss
-                        
+                    epoch_total_loss += loss
+                    epoch_det_loss += det_loss
+                    epoch_fir_loss += fir_loss
+                    epoch_dist_loss += dist_loss
+                    epoch_tv_loss += tv_loss
+                    epoch_nps_loss += nps_loss
+                    epoch_satur_loss += satur_loss
 
                     if j%5 == 0:
                         iteration = self.config.batch_size * i + j
+                        self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
+                        self.writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('misc/epoch', i, iteration)
 
                 avg_total_loss = epoch_total_loss/self.config.batch_size
                 avg_det_loss = epoch_det_loss/self.config.batch_size
                 avg_fir_loss = epoch_fir_loss/self.config.batch_size
                 avg_dist_loss = epoch_dist_loss/self.config.batch_size
+                avg_tv_loss = epoch_tv_loss/self.config.batch_size
+                avg_nps_loss = epoch_nps_loss/self.config.batch_size
+                avg_satur_loss = epoch_satur_loss/self.config.batch_size
             
                 print('\nEpoch, i:', i)
                 print('avg_total_loss:',avg_total_loss)
@@ -470,9 +478,9 @@ class Seeing():
                     # print(optimizer.param_groups[0]['lr'])                
                 
 
-                end = time.time()
-                t = end - start
-                print("time taken: ", t)
+                epoch_end = time.time()
+                t = epoch_end - epoch_start
+                print("One epoch time taken: ", t)
                 
                 
                 if i > 0 and i % 250 == 0:
@@ -482,16 +490,19 @@ class Seeing():
                 torch.cuda.empty_cache()
                 
                 if i % 5 == 0:
-                    end_time = time.time()
-                    t = (end_time - init_time)/60
+                    curr_time = time.time()
+                    accumulated_time = (curr_time - init_time)/60
                     iteration = self.config.batch_size * (i+1)
                     self.writer.add_scalar('avg/total_loss', avg_total_loss.detach().cpu().numpy(), i)
                     self.writer.add_scalar('avg/det_loss', avg_det_loss.detach().cpu().numpy(), i)
                     self.writer.add_scalar('avg/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
                     self.writer.add_scalar('avg/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/tv_loss', avg_tv_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
 
                     # self.writer.add_scalar('misc/learning_rate', epsilon, i)
-                    self.writer.add_scalar('misc/duration', round(t, 3), i)
+                    self.writer.add_scalar('misc/duration', round(accumulated_time, 3), i)
                     self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
                     # self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
                     self.writer.add_image('adv_stop', patch_fix.squeeze(), i)
