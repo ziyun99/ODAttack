@@ -89,11 +89,11 @@ class Seeing():
         self.classes = load_classes(self.config.classes)
 
     def attack(self):
-        img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
-        prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
+#         img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+#         prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
         ori_index = 11
-        ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
-        first_index = ind_nz_out[0]
+#         ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
+#         first_index = ind_nz_out[0]
 
         adv_label = [1 if i == 11 else 0 for i in range(80)] #stop sign=11,traffic_light=9
         adv_label = np.array(adv_label)
@@ -101,7 +101,7 @@ class Seeing():
         adv_label = torch.from_numpy(adv_label).float()
 
         s = time.time()
-        patch_adv, input1 = self.get_adv_episilon(img_ori, adv_label, first_index, ori_index)
+        patch_adv, input1 = self.get_adv_episilon(adv_label, ori_index)
         e = time.time()
         print("time_taken: ", str(e-s))
         
@@ -110,21 +110,10 @@ class Seeing():
 
         print("Done and exit")
                           
-    def get_adv_episilon(self, img_ori,adv_label,first_index,ori_index):
+    def get_adv_episilon(self, adv_label, ori_index):
         self.writer = self.init_tensorboard()
-        
-        fir_p = 0.3
-        dist_p = 1.0
-        tv_p = 0.9
-        nps_p = 0.5
-        satur_p = 0.5
-        fir_flag = False
-        dist_flag = True
-        tv_flag = True
-        nps_flag = False
-        satur_flag = True
-        
-        text = "Experiment: " + self.config.exp + " | fir: " + str(fir_flag) + " " + str(fir_p) + " | dist: " + str(dist_flag) + " " + str(dist_p) + " | tv: " + str(tv_flag) + " " + str(tv_p) + " | nps: " + str(nps_flag) + " " + str(nps_p) + " | satur: " + str(satur_flag) + " " + str(satur_p)
+  
+        text = "Experiment: " + self.config.exp + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
         self.writer.add_text('param', text, 0) 
 
         # x_c=100
@@ -339,37 +328,37 @@ class Seeing():
                     
                     loss = det_loss
                     
-                    if fir_flag:
-                        adap=fir_p*float(det_loss.data/(1/fir_loss.data))
-                        loss=det_loss+adap*(1/fir_loss)
+                    if self.config.fir_flag:
+                        adap = self.config.fir_p*float(det_loss.data/(1/fir_loss.data))
+                        loss = det_loss+adap*(1/fir_loss)
                         print('adap:', adap)
                         print('1/fir_loss:', 1/fir_loss)
                         print('loss2:', loss)
-    
-                    if dist_flag:
-                        adap=dist_p*float(det_loss.data/dist_loss.data)
-                        loss=loss+adap*(dist_loss)
+
+                    if self.config.dist_flag:
+                        adap = self.config.dist_p*float(det_loss.data/dist_loss.data)
+                        loss = loss + adap*(dist_loss)
                         print('adap:', adap)           
                         print('loss3:', loss)
-                
-                    if tv_flag:
-                        adap=tv_p*float(det_loss.data/tv_loss.data)
-                        loss=loss+adap*(tv_loss)
+
+                    if self.config.tv_flag:
+                        adap = self.config.tv_p*float(det_loss.data/tv_loss.data)
+                        loss = loss + adap*(tv_loss)
                         print('adap:', adap)           
                         print('loss4:', loss)
-                    
-                    if nps_flag:
-                        adap=nps_p*float(det_loss.data/nps_loss.data)
-                        loss=loss+adap*(nps_loss)
+
+                    if self.config.nps_flag:
+                        adap = self.config.nps_p*float(det_loss.data/nps_loss.data)
+                        loss = loss + adap*(nps_loss)
                         print('adap:', adap)           
                         print('loss5:', loss)
-                                    
-                    if satur_flag:
-                        adap=satur_p*float(det_loss.data/satur_loss.data)
-                        loss=loss+adap*(satur_loss)
+
+                    if self.config.satur_flag:
+                        adap = self.config.satur_p*float(det_loss.data/satur_loss.data)
+                        loss = loss + adap*(satur_loss)
                         print('adap:', adap)           
                         print('loss6:', loss)
-                        
+
                     print("loss", loss.requires_grad)
                     print("patch_four", patch_four.requires_grad)
     #                 print("patch_four", patch_four.shape, patch_fix.shape, input1.shape)
