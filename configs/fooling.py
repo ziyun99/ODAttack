@@ -13,6 +13,8 @@ class BaseConfig(object):
         self.attack_method = "fooling"
         self.attack_class = "Fooling"
         self.path = os.path.join(os.getcwd(),'fooling/')
+        self.logdir = os.path.join(self.path,"logdir/")
+        self.name = None
         
         self.img_dir = os.path.join(self.path,"inria/Train/pos")
         self.lab_dir = os.path.join(self.path,"inria/Train/pos/yolo-labels")
@@ -116,7 +118,7 @@ class ReproducePaperObj(BaseConfig):
 
     def __init__(self):
         super().__init__()
-
+        self.name = paper_obj
         self.batch_size = 8
         self.patch_size = 300
 
