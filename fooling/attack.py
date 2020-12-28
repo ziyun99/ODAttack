@@ -36,12 +36,12 @@ class Fooling(object):
         self.total_variation = TotalVariation().cuda()
 
         self.writer = self.init_tensorboard()
-
-    def init_tensorboard(self, name=None):
-#         subprocess.Popen(['tensorboard', '--logdir=runs'])
+        
+    def init_tensorboard(self):
+        # subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir={self.config.logdir}'])
+        time_str = time.strftime("%Y%m%d-%H%M%S")
         if self.config.name is not None:
-            time_str = time.strftime("%Y%m%d-%H%M%S")
-            return SummaryWriter(f'{self.config.logdir}/{time_str}_{name}')
+            return SummaryWriter(f'{self.config.logdir}/{time_str}_{self.config.name}')
         else:
             return SummaryWriter(f'{self.config.logdir}/{time_str}')
 
@@ -50,7 +50,6 @@ class Fooling(object):
         Optimize a patch to generate an adversarial example.
         :return: Nothing
         """
-
         img_size = self.darknet_model.height
         batch_size = self.config.batch_size
         n_epochs = 10000
