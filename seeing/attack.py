@@ -147,12 +147,11 @@ class Seeing():
         init_time = time.time()
         suc_rate = 0
         try: 
-            for i in range(self.config.nsteps):
+            for i in range(self.config.nepochs):
                 start = time.time()
-                jsteps=20
                 original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
                 original_stop = original_stop[0, :, :, :]
-                for j in range(jsteps):
+                for j in range(self.config.batch_size):
                     print("\nEpoch: {}, step: {}".format(i, j))
                     patch_f = patch_four * map_4_patches
                     patch_fix = original_stop * map_4_stop + patch_f
@@ -279,11 +278,11 @@ class Seeing():
                     stop_4=(stop_4<0.1).float().unsqueeze(0)
                     stop_4=torch.cat((stop_4,stop_4,stop_4),0)
                     #   img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-    #                 adv_stop_img = patch_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                    # adv_stop_img = patch_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input[0,:,start_x:end_x,start_y:end_y] = patch_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
 
-    #                 ori_stop_img = ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4                 
+                    # ori_stop_img = ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4                 
                     img_input2[0,:,start_x:end_x,start_y:end_y] = ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
                     
@@ -361,25 +360,42 @@ class Seeing():
 
                     print("loss", loss.requires_grad)
                     print("patch_four", patch_four.requires_grad)
-    #                 print("patch_four", patch_four.shape, patch_fix.shape, input1.shape)
+                    # print("patch_four", patch_four.shape, patch_fix.shape, input1.shape)
                     print("backward")
                     loss.backward()
-    #                 print("After loss.backward(): patch_four grad data: ", patch_four.grad.data)
+                    # print("After loss.backward(): patch_four grad data: ", patch_four.grad.data)
 
+                    if self.config.optimizer == "fgsm":
+                        input_grad = input1.grad.data
+                        # print("input_grad", input_grad)
+                        # input_grad = torch.sign(input_grad)
+
+                        #inverse_rescale
+                        grad_resize1 = input_grad[0,:,start_x:end_x,start_y:end_y]
+                        grad_resize1 = cv2.resize(grad_resize1.cpu().numpy().transpose(1,2,0),(width,height),cv2.INTER_CUBIC)
+                        if(perspective == 1):
+                           perspective = 0
+                           grad_resize1 = inverse_perspective_transform(grad_resize1,org,dst)
+                        grad_resize1 = torch.from_numpy(grad_resize1.transpose(2,0,1)).to(device)
+                        if j==0:
+                           grad_resize = grad_resize1          
+                        else:
+                           grad_resize += grad_resize1
+                
+                    elif self.config.optimizer == "adam" and not self.config.batch_variation:
                     # no batch variation
-    #                 grad_sum = torch.sum(patch_four.grad.data)
-    #                 if grad_sum == 0:
-    #                     print("WARNING: ZERO GRADIENT")
-    #                     return
-    #                 else: 
-    #                     print("ACCUMULATED GRADIENT", grad_sum)
-                    
-    #                 optimizer.step()
-    # #                 print("After optimizer.step(): patch_four grad data: ", patch_four.grad.data)
-    #                 optimizer.zero_grad()
-    # #                 print("After zero_grad: patch_four grad data: ", patch_four.grad.data)
-    # #                 patch_four=patch_four*map_4_patches
-    #                 patch_four.data.clamp_(0,1)       #keep patch in image range
+                        grad_sum = torch.sum(patch_four.grad.data)
+                        if grad_sum == 0:
+                            print("WARNING: ZERO GRADIENT")
+                            return
+                        else: 
+                            print("ACCUMULATED GRADIENT", grad_sum)
+                        optimizer.step()
+                        # print("After optimizer.step(): patch_four grad data: ", patch_four.grad.data)
+                        optimizer.zero_grad()
+                        # print("After zero_grad: patch_four grad data: ", patch_four.grad.data)
+                        # patch_four=patch_four*map_4_patches
+                        patch_four.data.clamp_(0,1)       #keep patch in image range
                                 
                     if j==0:
                         epoch_total_loss = loss
@@ -395,7 +411,7 @@ class Seeing():
                         
 
                     if j%5 == 0:
-                        iteration = jsteps * i + j
+                        iteration = self.config.batch_size * i + j
                         self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
@@ -404,72 +420,76 @@ class Seeing():
                         self.writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
                         self.writer.add_scalar('misc/epoch', i, iteration)
-    #                     self.writer.add_scalar('misc/accumulated_gradient', grad_sum, iteration)
-                        
-    #                     if(addweight_transform == "False"):
-    #                         writer.add_image('misc/patch_fix', patch_fix.squeeze(), iteration) 
-    #                         writer.add_image('misc/patch_transform', patch_transform.squeeze(), iteration) 
-    #                         writer.add_image('misc/patch_pers_transform', patch_pers_transform.squeeze(), iteration) 
-    #                         writer.add_image('misc/patch_resize', patch_resize.squeeze(), iteration) 
-    #                         writer.add_image('misc/ori_stop2_resize', ori_stop2_resize.squeeze(), iteration) 
-    #                         writer.add_image('misc/stop_4', stop_4.squeeze(), iteration) 
-    # #                         writer.add_image('misc/adv_stop_img', adv_stop_img.squeeze(), iteration) 
-    #                         writer.add_image('misc/input1', input1.squeeze(), iteration) 
-    #                         writer.add_image('misc/input2', input2.squeeze(), iteration) 
 
-    #                         writer.add_text('misc/addweight_transform', addweight_transform, iteration) 
-
-    #                 del loss1, loss2, patch_transform
-
-                avg_total_loss = epoch_total_loss/jsteps
-                avg_det_loss = epoch_det_loss/jsteps
-                avg_fir_loss = epoch_fir_loss/jsteps
-                avg_dist_loss = epoch_dist_loss/jsteps
+                avg_total_loss = epoch_total_loss/self.config.batch_size
+                avg_det_loss = epoch_det_loss/self.config.batch_size
+                avg_fir_loss = epoch_fir_loss/self.config.batch_size
+                avg_dist_loss = epoch_dist_loss/self.config.batch_size
             
                 print('\nEpoch, i:', i)
                 print('avg_total_loss:',avg_total_loss)
                 
-                # batch variation update
-    #             need to average the grad_data in patch_four?
-                print("Before averaging the gradients: ")
-                grad_sum = torch.sum(patch_four.grad.data)           
-                if grad_sum == 0:
-                    print("WARNING: ZERO GRADIENT")
-                    return
-                else: 
-                    print("ACCUMULATED GRADIENT", grad_sum)
-                        
-                patch_four.grad.data /= jsteps
-                print("After averaging the gradients: ")
-                avg_grad_sum = torch.sum(patch_four.grad.data)           
-                if avg_grad_sum == 0:
-                    print("WARNING: ZERO GRADIENT")
-                    return
-                else: 
+                if self.config.optimizer == "fgsm":
+                    grad_resize = grad_resize/self.config.batch_size  #need to average the gradient?
+                    avg_grad_sum = torch.sum(grad_resize)
                     print("AVERAGE GRADIENT, sum:", avg_grad_sum)
-                                
-                optimizer.step()
-                print("After optimizer.step()")
-                grad_sum = torch.sum(patch_four.grad.data)
-                print("VALID GRADIENT", grad_sum)
-                
-                optimizer.zero_grad()
-                print("After zero_grad:")
-                grad_sum = torch.sum(patch_four.grad.data)
-                if grad_sum == 0:
-                    print("ZERO GRADIENT")
-                else: 
-                    print("NON-ZERO GRADIENT", grad_sum)
-                    
-    #             patch_four=patch_four*map_4_patches
-                patch_four.data.clamp_(0,1)       #keep patch in image range
+
+                    # add epsilon
+                    epsilon = 0.05 / (math.floor(i/100) + 1)
+                    grad_4_patches = grad_resize * map_4_patches
+                    # print(grad_resize)
+                    # print(torch.sign(grad_4_patches))
+                    epsilon_4_patches = epsilon * torch.sign(grad_4_patches) #FGSM attack
+                    patch_four = patch_four - epsilon_4_patches * map_4_patches
+                    patch_four = torch.clamp(patch_four, 0, 1)
+                    patch_f = patch_four
+
+                    #random original _stop
+                    original_stop = get_random_stop_ori(imlist_stop).to(device)
+                    original_stop = original_stop[0, :, :, :]
+                    patch_fix = original_stop * map_4_stop + patch_four
+                    patch_fix = torch.clamp(patch_fix, 0, 1)
             
-        
-    #             epsilon = optimizer.param_groups[0]['lr']
+                elif self.config.optimizer == "adam" and self.config.batch_variation:
+                # batch variation update #need to average the grad_data in patch_four?
+                    print("Before averaging the gradients: ")
+                    grad_sum = torch.sum(patch_four.grad.data)           
+                    if grad_sum == 0:
+                        print("WARNING: ZERO GRADIENT")
+                        return
+                    else: 
+                        print("ACCUMULATED GRADIENT", grad_sum)
+
+                    patch_four.grad.data /= self.config.batch_size
+                    print("After averaging the gradients: ")
+                    avg_grad_sum = torch.sum(patch_four.grad.data)           
+                    if avg_grad_sum == 0:
+                        print("WARNING: ZERO GRADIENT")
+                        return
+                    else: 
+                        print("AVERAGE GRADIENT, sum:", avg_grad_sum)
+
+                    optimizer.step()
+                    print("After optimizer.step()")
+                    grad_sum = torch.sum(patch_four.grad.data)
+                    print("VALID GRADIENT", grad_sum)
+
+                    optimizer.zero_grad()
+                    print("After zero_grad:")
+                    grad_sum = torch.sum(patch_four.grad.data)
+                    if grad_sum == 0:
+                        print("ZERO GRADIENT")
+                    else: 
+                        print("NON-ZERO GRADIENT", grad_sum)
+                    # patch_four=patch_four*map_4_patches
+                    patch_four.data.clamp_(0,1)       #keep patch in image range
+
+
+                # epsilon = optimizer.param_groups[0]['lr']
                 if i%20 == 0:
-    #                 print("New learning rate: ")
+                    # print("New learning rate: ")
                     scheduler.step(avg_total_loss)
-    #                 print(optimizer.param_groups[0]['lr'])                
+                    # print(optimizer.param_groups[0]['lr'])                
                 
 
                 end = time.time()
@@ -486,7 +506,7 @@ class Seeing():
                 if i % 5 == 0:
                     end_time = time.time()
                     t = (end_time - init_time)/60
-                    iteration = jsteps * (i+1)
+                    iteration = self.config.batch_size * (i+1)
                     self.writer.add_scalar('avg/total_loss', avg_total_loss.detach().cpu().numpy(), i)
                     self.writer.add_scalar('avg/det_loss', avg_det_loss.detach().cpu().numpy(), i)
                     self.writer.add_scalar('avg/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
@@ -495,7 +515,7 @@ class Seeing():
     #                 self.writer.add_scalar('misc/learning_rate', epsilon, i)
                     self.writer.add_scalar('misc/duration', round(t, 3), i)
                     self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
-                    self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
+#                     self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
                     self.writer.add_image('adv_stop', patch_fix.squeeze(), i)
                     self.writer.add_image('patch', patch_f.squeeze(), i)
                     self.writer.add_image('adv_img', input1.squeeze(), i)
@@ -975,7 +995,6 @@ def yolo_test(num_test, patch_test):
             
             
             is_success = 0
-            save_every = save_interval
             if detect2 != 0:
                 total_frames += 1
                 if detect==0:
