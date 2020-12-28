@@ -38,12 +38,12 @@ class Fooling(object):
         self.writer = self.init_tensorboard()
 
     def init_tensorboard(self, name=None):
-        subprocess.Popen(['tensorboard', '--logdir=runs'])
-        if name is not None:
+#         subprocess.Popen(['tensorboard', '--logdir=runs'])
+        if self.config.name is not None:
             time_str = time.strftime("%Y%m%d-%H%M%S")
-            return SummaryWriter(f'runs/{time_str}_{name}')
+            return SummaryWriter(f'{self.config.logdir}/{time_str}_{name}')
         else:
-            return SummaryWriter()
+            return SummaryWriter(f'{self.config.logdir}/{time_str}')
 
     def attack(self):
         """
