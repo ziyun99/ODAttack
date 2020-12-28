@@ -11,7 +11,6 @@ import os
 import os.path as osp
 import random
 import pickle as pkl
-import itertools
 import numpy as np
 import cv2
 import copy
@@ -21,8 +20,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torchvision import datasets, transforms
 import torch.utils.data as Data
-from torch import autograd
-from torch import optim
+from torch import autograd, optim
 import torch.nn.functional as F
 
 from helper.util import *
@@ -85,24 +83,16 @@ class Seeing():
         self.num_classes = len(self.classes)
 
     def attack(self):
-        # img_ori = self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
-        # prediction_dog, feature_dog = self.model(img_ori, self.config.CUDA)  # feature_archor_output
         ori_index = 11
-        # ind_nz_out = get_ind(prediction_dog, ori_index)  # 1=bicycle,11=stop_sign,9=traffic_light
-        # first_index = ind_nz_out[0]
-
-        adv_label = [1 if i == 11 else 0 for i in range(80)] #stop sign=11,traffic_light=9
+        adv_label = [1 if i == ori_index else 0 for i in range(self.num_classes)] #stop sign=11,traffic_light=9
         adv_label = np.array(adv_label)
-        adv_label = np.reshape(adv_label,(1,80))
+        adv_label = np.reshape(adv_label,(1,self.num_classes))
         adv_label = torch.from_numpy(adv_label).float()
 
-        s = time.time()
         patch_adv, input1 = self.get_adv_episilon(adv_label, ori_index)
-        e = time.time()
-        print("time_taken: ", str(e-s))
-        
-        # save_img(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
-        # det_and_save_img(input1, os.path.join(self.config.out_path, 'final/adv_img'))
+
+        # self.save_img_i(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
+        # self.det_and_save_img_i(input1, os.path.join(self.config.out_path, 'final/adv_img'))
 
         print("Done and exit")
                           
@@ -112,32 +102,24 @@ class Seeing():
         text = "Experiment: " + self.config.name + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
         self.writer.add_text('param', text, 0) 
 
-        # x_c=100
-        # y_c=150
-
         #img_ori
         img_ori= self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201)
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
         original_stop0 = original_stop
         
         #pole
-        # patch_pole=torch.zeros(3,27,201).to(self.config.device)
         ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
 
-        #patch_fix
-        # patch_fix=original_stop
+        if self.config.optimizer == "adam":
+            patch_four=Variable(patch_four, requires_grad=True)
 
-        patch_four=Variable(patch_four, requires_grad=True)
-        # patch_fix = original_stop*map_4_stop+patch_four
-        # patch_fix=torch.clamp(patch_fix,0,1)
-
-        optimizer = optim.Adam([patch_four], lr=0.03, amsgrad=True)
-        scheduler_factory = lambda x: optim.lr_scheduler.ReduceLROnPlateau(x, 'min', patience=50)
-        scheduler = scheduler_factory(optimizer)
-        print("patch_four", patch_four.requires_grad)
-        
+            optimizer = optim.Adam([patch_four], lr=0.03, amsgrad=True)
+            scheduler_factory = lambda x: optim.lr_scheduler.ReduceLROnPlateau(x, 'min', patience=50)
+            scheduler = scheduler_factory(optimizer)
+            print("patch_four", patch_four.requires_grad)
+            
         printability_array = self.get_printability_array().to(self.config.device)
         
         init_time = time.time()
@@ -524,7 +506,15 @@ class Seeing():
         return patch_fix, input1
         #return patch_fix,output_adv
 
-    def get_test_input(self, input_dim, CUDA, path):
+    def init_tensorboard(self):
+        # subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir={self.config.logdir}'])
+        time_str = time.strftime("%Y%m%d-%H%M%S")
+        if self.config.name is not None:
+            return SummaryWriter(f'{self.config.logdir}/{time_str}_{self.config.name}')
+        else:
+            return SummaryWriter(f'{self.config.logdir}/{time_str}')
+
+    def get_test_input(self, input_dim, path):
         img = cv2.imread(path)
         img = cv2.resize(img, (input_dim, input_dim))
 
@@ -535,17 +525,8 @@ class Seeing():
         img_ = img_.to(self.config.device)
         return img_
 
-    def init_tensorboard(self):
-        # subprocess.Popen(['tensorboard', '--host 0.0.0.0 --port 8080 --logdir={self.config.logdir}'])
-        time_str = time.strftime("%Y%m%d-%H%M%S")
-        if self.config.name is not None:
-            return SummaryWriter(f'{self.config.logdir}/{time_str}_{self.config.name}')
-        else:
-            return SummaryWriter(f'{self.config.logdir}/{time_str}')
-
-    def get_stop_patch(self, input_dim=201):
-        # images='stop/'
-        img = cv2.imread(os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
+    def get_stop_patch(self, input_dim, path):
+        img = cv2.imread(path)
         img = cv2.resize(img, (input_dim, input_dim))
         img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
         img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
@@ -573,8 +554,8 @@ class Seeing():
         return stop_ori[0,:,:,:],map_ori[0,:,:,:],map_stop[0,:,:,:],patch_stop[0,:,:,:]   #output:original stop, map mask for patch, map mask for stop, four patch
         #original_stop,map_4_patches,map_4_stop,patch_four
 
-    def get_pole(self, character_path):
-        img = cv2.imread(character_path)
+    def get_pole(self, path):
+        img = cv2.imread(path)
         img = cv2.resize(img, (201, 27))
         img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
         img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
@@ -615,7 +596,7 @@ class Seeing():
         cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1)
         return img
 
-    def det_and_save_img_i(self, img , i, path):
+    def det_and_save_img_i(self, img , path, i=0):
         prediction,feature_out = self.model(img , CUDA)
         output = write_results(self.config.device, prediction.data, self.config.confidence, self.num_classes, nms = True, nms_conf = nms_thesh)#final_output,[:,8] 8=input_img_num,xc,yc,width,height,confidence,confidence_class,class
 
@@ -629,7 +610,7 @@ class Seeing():
         cv2.imwrite(path+'_det/'+str(i)+'.png', img_draw)
         print("Saved img: ", path+'_det/'+str(i)+'.png')
 
-    def save_img_i(self, img,i,path):
+    def save_img_i(self, img, path, i=0):
         img_save = inp_to_image(img)
         cv2.imwrite(path+str(i)+'.png', img_save)
         print("Saved img: ", path+str(i)+'.png')
@@ -695,10 +676,10 @@ class Seeing():
         height_pole=27
 
         #img_ori
-        img_ori= self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+        img_ori= self.get_test_input(self.inp_dim, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201)
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
         
         #pole
         patch_pole=torch.zeros(3,27,201).to(self.config.device)
@@ -706,8 +687,7 @@ class Seeing():
 
         #patch_fix
         patch_fix=torch.zeros(3,201,201).to(self.config.device)
-        # patch_fix[:,:,:]=stop_adv[:,:,:]
-        
+
         #map
         map_ori=torch.zeros(1,3,416,416).to(self.config.device)
         map_resize=torch.zeros(1,3,416,416).to(self.config.device)# the map of all three patches
