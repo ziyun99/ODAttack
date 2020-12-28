@@ -11,7 +11,7 @@ class BaseConfig(object):
         """
         Set the defaults.
         """
-        self.attack_method = "invisible"
+        self.attack_method = "Invisible"
         self.attack_class = "EOTB_attack"
         self.path = os.path.join(os.getcwd(),'invisible/')
         self.out_path = os.path.join(os.getcwd(),'invisible/result/')
