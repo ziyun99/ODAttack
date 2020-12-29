@@ -103,10 +103,10 @@ class Seeing():
         self.writer.add_text('param', text, 0) 
 
         #img_ori
-        img_ori= self.get_test_input(self.inp_dim, self.config.CUDA, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+        img_ori= self.get_test_input(self.inp_dim, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
         original_stop0 = original_stop
         
         #pole
@@ -255,16 +255,16 @@ class Seeing():
                     end_pole_x=int(x_c+(width_r-1)/2+width_pole_r+1)
                     # print(start_x,end_x,start_y,end_y)
 
-                    #map_resize just for saturation calculation
+                    # map_resize just for saturation calculation
                     map_resize[0,:,start_x:end_x,start_y:end_y]=map_4_patches_resize
                     img_input[:,:,:,:]=img_ori[:,:,:,:]
                     img_input2[:,:,:,:]=img_ori[:,:,:,:]
 
-                    #     get four corners of stop
+                    # get four corners of stop
                     stop_4=torch.sum(ori_stop_resize[:,:,:],0)
                     stop_4=(stop_4<0.1).float().unsqueeze(0)
                     stop_4=torch.cat((stop_4,stop_4,stop_4),0)
-                    #   img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                    # img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     # adv_stop_img = patch_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input[0,:,start_x:end_x,start_y:end_y] = patch_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
@@ -273,7 +273,8 @@ class Seeing():
                     img_input2[0,:,start_x:end_x,start_y:end_y] = ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                     img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
                     
-                    input1=img_input
+                    # input1=img_input
+                    input1=Variable(img_input, requires_grad=True)
                     input2=Variable(img_input2, requires_grad=False)
                     print("input1", input1.requires_grad)
 
@@ -471,12 +472,12 @@ class Seeing():
                     patch_four.data.clamp_(0,1)       #keep patch in image range
 
 
-                # epsilon = optimizer.param_groups[0]['lr']
-                if i%20 == 0:
-                    # print("New learning rate: ")
-                    scheduler.step(avg_total_loss)
-                    # print(optimizer.param_groups[0]['lr'])                
-                
+                    # epsilon = optimizer.param_groups[0]['lr']
+                    if i%20 == 0:
+                        # print("New learning rate: ")
+                        scheduler.step(avg_total_loss)
+                        # print(optimizer.param_groups[0]['lr'])                
+                    
 
                 epoch_end = time.time()
                 t = epoch_end - epoch_start
@@ -690,7 +691,7 @@ class Seeing():
         img_ori= self.get_test_input(self.inp_dim, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(input_dim=201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
+        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
         
         #pole
         patch_pole=torch.zeros(3,27,201).to(self.config.device)
