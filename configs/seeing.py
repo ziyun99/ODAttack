@@ -58,8 +58,8 @@ class BaseConfig(object):
         self.satur_flag = True
         
         # attack approach
-        self.batch_variation = True
-        self.optimizers = ["fgsm, adam"]
+        self.batch_variation = False
+        self.optimizers = ["fgsm", "adam"]
         self.optimizer = self.optimizers[0]
         
         self.ntests = 1000
