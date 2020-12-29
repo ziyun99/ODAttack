@@ -30,6 +30,7 @@ class BaseConfig(object):
         self.scheduler_factory = lambda x: optim.lr_scheduler.ReduceLROnPlateau(x, 'min', patience=50)
         self.max_tv = 0
 
+        self.n_epochs = 10000
         self.batch_size = 20
 
         self.loss_target = lambda obj, cls: obj * cls
@@ -118,7 +119,7 @@ class ReproducePaperObj(BaseConfig):
 
     def __init__(self):
         super().__init__()
-        self.name = paper_obj
+        self.name = "paper_obj"
         self.batch_size = 8
         self.patch_size = 300
 
