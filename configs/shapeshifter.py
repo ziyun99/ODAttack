@@ -17,7 +17,8 @@ class BaseConfig(object):
         self.attack_class = "Shapeshifter"
         self.path = os.path.join(os.getcwd(),'shapeshifter/')
         self.out_path = os.path.join(os.getcwd(),'shapeshifter/result/')
-
+        self.logdir = os.path.join(self.path, LOG_DIR)
+        
         self.verbose = True
         self.seed = None
 
@@ -248,6 +249,12 @@ class StopSignTargeted(StopSignBase):
         self.rpn_cls_weight = 0 
         self.box_cls_weight = 1 
 
+
+class StopSignTargeted_Patch(StopSignTargeted):
+    def __init__(self):
+        super().__init__()
+        self.textures_masks = [os.path.join(self.path, DATA_DIR + "patch_four.png")]
+        
 # 2d_stopsign_untargeted_attack ## Create 2d stop sign that is not detected as a stop sign.
 class StopSignUntargeted(StopSignBase):
     def __init__(self):
@@ -480,6 +487,7 @@ custom_configs = {
     "person_hybrid_t": PersonHybridTargeted,
     "person_hybrid_ut": PersonHybridUntargeted,
 
+    "stop_t_patch": StopSignTargeted_Patch,
     # "person_t_3d": PersonTargeted3D,
     # "person_ut_3d": PersonUntargeted3D,
     # "person_p_3d": PersonProposal3D,
