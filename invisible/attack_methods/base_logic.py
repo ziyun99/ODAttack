@@ -269,9 +269,9 @@ class ODD_logic():
                         new_sticker[j,i] = 255
         
         assert new_sticker is not None
-        is_saved=cv2.imwrite(self.config.path+save_name, new_sticker)
+        is_saved=cv2.imwrite(self.config.out_path+save_name, new_sticker)
         if is_saved:
-            print(("Sticker saved under:", self.config.path+save_name))
+            print(("Sticker saved under:", self.config.out_path+save_name))
         else:
             print("Sticker saving error")
 
