@@ -52,14 +52,14 @@ class Fooling(object):
         """
         img_size = self.darknet_model.height
         batch_size = self.config.batch_size
-        n_epochs = 10000
+        n_epochs = self.config.n_epochs
         max_lab = 14
 
         time_str = time.strftime("%Y%m%d-%H%M%S")
 
         # Generate stating point
         adv_patch_cpu = self.generate_patch("gray")
-        #adv_patch_cpu = self.read_image("saved_patches/patchnew0.jpg")
+        #adv_patch_cpu = self.read_image(self.config.path + "saved_patches/patchnew0.jpg")
 
         adv_patch_cpu.requires_grad_(True)
 
