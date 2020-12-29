@@ -19,7 +19,7 @@ from attack_methods.base_logic import ODD_logic
 
 class Invisible(ODD_logic):
     def __init__(self, config, args):
-        super(EOTB_attack, self).__init__()
+        super(Invisible, self).__init__()
         self.model = config.model
         self.config = config
         self.success = 0
