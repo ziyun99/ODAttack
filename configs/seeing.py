@@ -96,8 +96,8 @@ class Adam_Batch(BaseConfig):
       
 custom_configs = {
     "base": BaseConfig,
-    "fgsm_single": Fgsm_NoBatch,
+    "fgsm_nobatch": Fgsm_NoBatch,
     "fgsm_batch": Fgsm_Batch,
-    "adam_single": Adam_NoBatch,
+    "adam_nobatch": Adam_NoBatch,
     "adam_batch": Adam_Batch,
 }
