@@ -48,29 +48,56 @@ class BaseConfig(object):
         #params
         self.fir_p = 0.3
         self.dist_p = 1.0
-        self.tv_p = 0.9
+        self.tv_p = 0.1
         self.nps_p = 0.5
         self.satur_p = 0.5
-        self.fir_flag = False
+        self.fir_flag = True
         self.dist_flag = True
-        self.tv_flag = True
+        self.tv_flag = False
         self.nps_flag = False
-        self.satur_flag = True
+        self.satur_flag = False
         
         # attack approach
-        self.batch_variation = False
+        self.batch_variation = True
         self.optimizers = ["fgsm", "adam"]
         self.optimizer = self.optimizers[0]
         
         self.ntests = 1000
         
-class Seeing(BaseConfig):
+class Fgsm_NoBatch(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.name = "adam" + "_batch" + "_dist"
+        self.name = "fgsm" + "_nobatch"
+        self.batch_variation = False
+        self.optimizer = self.optimizers[0]
 
+class Fgsm_Batch(BaseConfig):
+    def __init__(self):
+        super().__init__()
+        self.name = "fgsm" + "_batch" 
+        self.batch_variation = True
+        self.optimizer = self.optimizers[0]
 
+class Adam_NoBatch(BaseConfig):
+    def __init__(self):
+        super().__init__()
+        self.name = "adam" + "_nobatch"
+        self.batch_variation = False
+        self.optimizer = self.optimizers[1]
+
+class Adam_Batch(BaseConfig):
+    def __init__(self):
+        super().__init__()
+        self.name = "adam" + "_batch"
+        self.batch_variation = True
+        self.optimizer = self.optimizers[1]
+
+        
+      
 custom_configs = {
     "base": BaseConfig,
-    "seeing": Seeing
+    "fgsm_single": Fgsm_NoBatch,
+    "fgsm_batch": Fgsm_Batch,
+    "adam_single": Adam_NoBatch,
+    "adam_batch": Adam_Batch,
 }
