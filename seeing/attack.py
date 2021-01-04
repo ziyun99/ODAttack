@@ -112,14 +112,17 @@ class Seeing():
         self.writer.add_text('experiment_configuration', str(self.config.__dict__), 0) 
 
         #img_ori
-        img_ori= self.get_test_input(self.inp_dim, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+        img_ori= self.get_test_input(self.inp_dim, self.config.path_img_ori)
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
+        if self.config.from_mask:
+            original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch_from_mask(self.config.patch_dim)
+        else:
+            original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(self.config.patch_dim)
         original_stop0 = original_stop
         
         #pole
-        ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
+        ori_pole = self.get_pole(self.config.path_pole)
 
         if self.config.optimizer == "adam":
             patch_four=Variable(patch_four, requires_grad=True)
@@ -127,7 +130,7 @@ class Seeing():
             optimizer = optim.Adam([patch_four], lr=0.03, amsgrad=True)
             scheduler_factory = lambda x: optim.lr_scheduler.ReduceLROnPlateau(x, 'min', patience=50)
             scheduler = scheduler_factory(optimizer)
-            print("patch_four", patch_four.requires_grad)
+            if self.config.debug: print("patch_four", patch_four.requires_grad)
             
         printability_array = self.get_printability_array().to(self.config.device)
         
@@ -192,7 +195,7 @@ class Seeing():
                         patch_transform[:,:,:] = patch_fix[:,:,:]
                         patch_pole_transform[:,:,:] = ori_pole[:,:,:]
                         ori_stop2[:,:,:] = original_stop[:,:,:]
-                    print("patch_transform", patch_transform.requires_grad)
+                    if self.config.debug: print("patch_transform", patch_transform.requires_grad)
                     
                     if k % 2 == 0:
                         #perspective transform
@@ -223,7 +226,7 @@ class Seeing():
                         patch_pers_transform = patch_transform
                         ori_stop_perspective[:,:,:] = original_stop[:,:,:]
                         ori_stop2_pers[:,:,:] = ori_stop2[:,:,:]
-                    print("patch_pers_transform", patch_pers_transform.requires_grad)
+                    if self.config.debug: print("patch_pers_transform", patch_pers_transform.requires_grad)
 
                 
                     img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
@@ -243,9 +246,8 @@ class Seeing():
                     if(height_r % 2 == 0):
                         width_pole_r = width_pole_r + 1
                             
-                    print(width_r,height_r)
                     patch_resize = F.interpolate(patch_pers_transform.unsqueeze(0), (width_r,height_r)).squeeze()
-                    print("patch_resize", patch_resize.requires_grad)
+                    if self.config.debug: print("patch_resize", patch_resize.requires_grad)
 
                     patch_pole_resize = F.interpolate(patch_pole_transform.unsqueeze(0), (width_pole_r,height_pole_r)).squeeze()
                     ori_stop_resize = F.interpolate(ori_stop_perspective.unsqueeze(0), (width_r,height_r)).squeeze()
@@ -287,7 +289,7 @@ class Seeing():
                     else:
                         input1=img_input
                     input2=Variable(img_input2, requires_grad=False)
-                    print("input1", input1.requires_grad)
+                    if self.config.debug: print("input1", input1.requires_grad)
 
                     #forward
                     rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
@@ -329,38 +331,26 @@ class Seeing():
                     
                     if self.config.fir_flag:
                         adap = self.config.fir_p*float(det_loss.data/(1/fir_loss.data))
-                        loss = det_loss+adap*(1/fir_loss)
-                        print('adap:', adap)
-                        print('1/fir_loss:', 1/fir_loss)
-                        print('loss2:', loss)
+                        loss = loss + adap*(1/fir_loss)
 
                     if self.config.dist_flag:
                         adap = self.config.dist_p*float(det_loss.data/dist_loss.data)
                         loss = loss + adap*(dist_loss)
-                        print('adap:', adap)           
-                        print('loss3:', loss)
 
                     if self.config.tv_flag:
                         adap = self.config.tv_p*float(det_loss.data/tv_loss.data)
                         loss = loss + adap*(tv_loss)
-                        print('adap:', adap)           
-                        print('loss4:', loss)
 
                     if self.config.nps_flag:
                         adap = self.config.nps_p*float(det_loss.data/nps_loss.data)
                         loss = loss + adap*(nps_loss)
-                        print('adap:', adap)           
-                        print('loss5:', loss)
 
                     if self.config.satur_flag:
                         adap = self.config.satur_p*float(det_loss.data/satur_loss.data)
                         loss = loss + adap*(satur_loss)
-                        print('adap:', adap)           
-                        print('loss6:', loss)
 
-                    print("loss", loss.requires_grad)
-                    print("patch_four", patch_four.requires_grad)
-                    # print("patch_four", patch_four.shape, patch_fix.shape, input1.shape)
+                    if self.config.debug: print("loss", loss.requires_grad)
+                    if self.config.debug: print("patch_four", patch_four.requires_grad)
                     print("backward")
                     loss.backward()
                     # print("After loss.backward(): patch_four grad data: ", patch_four.grad.data)
@@ -435,16 +425,16 @@ class Seeing():
                     epoch_nps_loss += nps_loss
                     epoch_satur_loss += satur_loss
 
-                    if j%5 == 0:
-                        iteration = self.config.batch_size * i + j
-                        self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
-                        self.writer.add_scalar('misc/epoch', i, iteration)
+                    # if (j + 1) % 5 == 0:
+                    #     iteration = self.config.batch_size * i + j
+                    #     self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/fir_loss', fir_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/dist_loss', dist_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/tv_loss', tv_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/nps_loss', nps_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('loss/satur_loss', satur_loss.detach().cpu().numpy(), iteration)
+                    #     self.writer.add_scalar('misc/epoch', i, iteration)
 
 #                     del img_input, img_input2, ori_stop_perspective, ori_stop2, ori_stop2_pers, patch_transform, patch_pers_transform, patch_pole_transform, input2
 
@@ -528,7 +518,7 @@ class Seeing():
                 
                
                 test_start_time = time.time()
-                if i > 0 and i % self.config.test_interval == 0:                  
+                if self.config.run_test and (i + 1) % self.config.test_interval == 0:                  
                     suc_rate, suc_step, total_frames = self.yolo_test(self.config.ntests, copy.deepcopy(patch_four))
                     print("suc_rate, suc_step, total_frames", suc_rate, suc_step, total_frames)
                 test_end_time = time.time()
@@ -536,22 +526,21 @@ class Seeing():
                     
                 torch.cuda.empty_cache()
                 
-                if i % 5 == 0:
+                if (i + 1) % self.config.save_interval == 0:
                     curr_time = time.time()
                     accumulated_time = (curr_time - init_time)/60
-                    iteration = self.config.batch_size * (i+1)
-                    self.writer.add_scalar('avg/total_loss', avg_total_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('avg/det_loss', avg_det_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('avg/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
-                    self.writer.add_scalar('avg/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('avg/tv_loss', avg_tv_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('avg/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('avg/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
+                    # iteration = self.config.batch_size * (i+1)
+                    self.writer.add_scalar('loss/total_loss', avg_total_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('loss/det_loss', avg_det_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('loss/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
+                    self.writer.add_scalar('loss/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('loss/tv_loss', avg_tv_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('loss/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('loss/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
 
                     # self.writer.add_scalar('misc/learning_rate', epsilon, i)
                     self.writer.add_scalar('misc/duration', round(accumulated_time, 3), i)
                     self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
-                    # self.writer.add_scalar('misc/avg_grad_sum', avg_grad_sum, i)
                     self.writer.add_image('adv_stop', patch_fix.squeeze(), i)
                     self.writer.add_image('patch', patch_f.squeeze(), i)
                     self.writer.add_image('adv_img', input1.squeeze(), i)
@@ -575,8 +564,8 @@ class Seeing():
         img_ = img_.to(self.config.device)
         return img_
 
-    def get_stop_patch(self, input_dim, path):
-        img = cv2.imread(path)
+    def get_stop_patch(self, input_dim):
+        img = cv2.imread(self.config.path_ori_stop)
         img = cv2.resize(img, (input_dim, input_dim))
         img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
         img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
@@ -589,21 +578,45 @@ class Seeing():
         #   map_character_ori=torch.zeros(1,3,width,height).to(self.config.device)
         
         #  control the ratio of the patch on stop sign
-        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.58)]=1#rec_70  #ratio: 0.20
-        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.58)]=1
-        
-        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.72)]=1#rec_100  #0.29
-        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.72)]=1
-        #  map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.444)]=1#rec_90  #0.11
-        #  map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.444)]=1
-        map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.674)]=1#rec_90   #0.26
-        map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.674)]=1
+        if self.config.patch_ratio == 0.10:
+            map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.444)]=1#rec_90  #0.10
+            map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.444)]=1
+        elif self.config.patch_ratio == 0.20:
+            map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.58)]=1#rec_70  #0.20
+            map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.58)]=1
+        elif self.config.patch_ratio == 0.25:
+            map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.674)]=1#rec_90   #0.25
+            map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.674)]=1
+        elif self.config.patch_ratio == 0.30:
+            map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.72)]=1#rec_100  #0.30
+            map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.72)]=1
+        else:
+            # default to 0.25
+            map_ori[0,:,int(height*0.05):int(height*0.316),int(width*0.26):int(width*0.674)]=1#rec_90   #0.25
+            map_ori[0,:,int(height*0.673):int(height*0.94), int(width*0.26):int(width*0.674)]=1            
+
         map_stop=-(map_ori-1)
 
         patch_stop=stop_ori*map_ori
         return stop_ori[0,:,:,:],map_ori[0,:,:,:],map_stop[0,:,:,:],patch_stop[0,:,:,:]   #output:original stop, map mask for patch, map mask for stop, four patch
         #original_stop,map_4_patches,map_4_stop,patch_four
 
+    def get_stop_patch_from_mask(self, input_dim):
+        stop_ori = cv2.imread(self.config.path_ori_stop)
+        map4patch = cv2.imread(self.config.path_map4patch)
+        map4stop = cv2.imread(self.config.path_map4stop)
+        
+        stop_ori = cv2.resize(stop_ori, (input_dim, input_dim))
+        map4patch = cv2.resize(map4patch, (input_dim, input_dim))
+        map4stop = cv2.resize(map4stop, (input_dim, input_dim))
+
+        stop_ori = self.image_to_inp(stop_ori)
+        map4patch = self.image_to_inp(map4patch)
+        map4stop = self.image_to_inp(map4stop)
+        
+        patch_four=stop_ori*map4patch
+        return stop_ori[0,:,:,:],map4patch[0,:,:,:],map4stop[0,:,:,:],patch_four[0,:,:,:] 
+        
     def get_pole(self, path):
         img = cv2.imread(path)
         img = cv2.resize(img, (201, 27))
@@ -630,6 +643,12 @@ class Seeing():
         printability_array = np.float32(printability_array)
         pa = torch.from_numpy(printability_array)
         return pa
+
+    def image_to_inp(self, img):
+        img_ =  img[:,:,::-1].transpose((2,0,1)).copy()
+        img_out = torch.from_numpy(img_).float().div(255.0).unsqueeze(0)
+        img_out=img_out.to(self.config.device)
+        return img_out
 
     def write_archor(self, x, results):
         c1 = tuple(x[1:3].int())
@@ -726,14 +745,17 @@ class Seeing():
         height_pole=27
 
         #img_ori
-        img_ori= self.get_test_input(self.inp_dim, os.path.join(self.config.path, "imgs/det/stop_sign.jpg"))
+        img_ori= self.get_test_input(self.inp_dim, self.config.path_img_ori)
 
         #ori_stop
-        original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(201, os.path.join(self.config.path,'imgs/stop/stop1.jpg'))
-        
+        if self.config.from_mask:
+            original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch_from_mask(self.config.patch_dim)
+        else:
+            original_stop,map_4_patches,map_4_stop,patch_four=self.get_stop_patch(self.config.patch_dim)      
+            
         #pole
         patch_pole=torch.zeros(3,27,201).to(self.config.device)
-        ori_pole = self.get_pole(os.path.join(self.config.path,'imgs/pole/pole.jpg'))
+        ori_pole = self.get_pole(self.config.path_pole)
 
         #patch_fix
         patch_fix=torch.zeros(3,201,201).to(self.config.device)
@@ -778,7 +800,7 @@ class Seeing():
                     patch_transform[:,:,:] = patch_fix[:,:,:]
                     patch_pole_transform[:,:,:]=ori_pole[:,:,:]
                     ori_stop2[:,:,:]=original_stop[:,:,:]
-                # print("patch_transform", patch_transform.requires_grad)
+
                 angle = 1000 #random
                 if i % 3 == 0:
                     #perspective transform   
@@ -791,7 +813,6 @@ class Seeing():
                 #random background
                 img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
                 
-                # print("patch_transform", patch_transform.requires_grad)
                 if ((i+1)/2==0):
                         ratio = random.uniform(0.2, 1)
                 else:
@@ -838,33 +859,32 @@ class Seeing():
                 start_pole_x=int(x_c+(width_r-1)/2+1)
                 end_pole_x=int(x_c+(width_r-1)/2+width_pole_r+1)
 
-
-                img_input[:,:,:,:]=img_ori[:,:,:,:]
-                img_input2[:,:,:,:]=img_ori[:,:,:,:]
+                img_input[:,:,:,:] = img_ori[:,:,:,:]
+                img_input2[:,:,:,:] = img_ori[:,:,:,:]
 
                 # get four corners of stop
-                stop_4=torch.sum(ori_stop_resize[:,:,:],0)
-                stop_4=(stop_4<0.1).float().unsqueeze(0)
-                stop_4=torch.cat((stop_4,stop_4,stop_4),0)
+                stop_4 = torch.sum(ori_stop_resize[:,:,:],0)
+                stop_4 = (stop_4<0.1).float().unsqueeze(0)
+                stop_4 = torch.cat((stop_4,stop_4,stop_4),0)
                 
                 # img_input[0,:,start_x:end_x,start_y:end_y]=torch.clamp((patch_resize+map_character_resize),0,1)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
                 # add adv_stop and pole to background img
-                img_input[0,:,start_x:end_x,start_y:end_y]=patch_resize*(1-stop_4)+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-                img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
+                img_input[0,:,start_x:end_x,start_y:end_y]=patch_resize*(1-stop_4) + img_input[0,:,start_x:end_x,start_y:end_y] * stop_4
+                img_input[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y] = patch_pole_resize
 
-                img_input2[0,:,start_x:end_x,start_y:end_y]=ori_stop2_resize+img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
-                img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y]=patch_pole_resize
+                img_input2[0,:,start_x:end_x,start_y:end_y] = ori_stop2_resize + img_input[0,:,start_x:end_x,start_y:end_y]*stop_4
+                img_input2[0,:,start_pole_x:end_pole_x,start_pole_y:end_pole_y] = patch_pole_resize
 
-                input1=Variable(img_input, requires_grad=True)
-                input2=Variable(img_input2, requires_grad=True)
+                input1 = Variable(img_input, requires_grad=True)
+                input2 = Variable(img_input2, requires_grad=True)
                 
                 #forward
-                rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
+                rn_noise = torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
                 with torch.no_grad():
                     prediction, _ = self.model(torch.clamp(input1+rn_noise,0,1), self.config.CUDA)
                     prediction2, _ = self.model(torch.clamp(input2+rn_noise,0,1), self.config.CUDA)
-                detect=get_ind2(prediction, self.config.ori_index)
-                detect2=get_ind2(prediction2, self.config.ori_index)
+                detect = get_ind2(prediction, self.config.ori_index)
+                detect2 = get_ind2(prediction2, self.config.ori_index)
                 
                 
                 is_success = 0
@@ -883,17 +903,10 @@ class Seeing():
                 if total_frames > 0: 
                     suc_rate = suc_step/total_frames
                     
-                if i % 100 == 0:  
+                if (i + 1) % 100 == 0:  
                     print("Tests i:",i)
                     print('success_rate:', suc_rate)
-                    # output_dir = "./output/yolo_test/"
-                    # det_and_save_img_i(input1, i, output_dir + "adv_img") # Adversarial Example: woth background and adversarial stop sign
-                    # det_and_save_img_i(input2, i, output_dir + "ori_img")
-                    # save_img_i(patch_resize, i, output_dir + "debug/patch_resize/")
-                    # save_img_i(patch_pole_resize, i, output_dir + "debug/patch_pole_resize/")
-                    # save_img_i(stop_4, i, output_dir + "debug/stop_4/")
-                    # save_img_i(img_ori, i, output_dir + "debug/img_ori/")
-        
+
         except KeyboardInterrupt:
             print('KeyboardInterrupt')
             return suc_rate, suc_step, total_frames
