@@ -218,7 +218,7 @@ def get_ind(prediction,ori_index):
     ind_nz = torch.nonzero(prediction[0,:,4])
     # print('ind_nz.shape:',ind_nz.shape)
     if ind_nz.shape[0]==0:
-        return  [0]
+        return [0]
     else:
         ind_out=np.zeros(shape=[3, ind_nz.shape[0]])
         ind_out[0,:]=ind_nz[:,0] #index of (confidence>0.5&&label==target_label)
@@ -228,6 +228,18 @@ def get_ind(prediction,ori_index):
         ind_nz=ind_out[0,:].astype(np.int32)
         return ind_nz
 
+def get_ind2(prediction,ori_index):
+    conf_mask = ((prediction[:,:,4] > confidence)).float().unsqueeze(2)#confidence>0.5
+    max_a,max_b=torch.max(prediction[:,:,5:5+ num_classes],2)
+    conf_mask2 = (max_b == ori_index).float().unsqueeze(2)#1=bicycle,11=stop_sign,9=traffic_light
+    prediction = prediction*conf_mask2
+    prediction = prediction*conf_mask
+    ind_nz = torch.nonzero(prediction[0,:,4])
+    if ind_nz.shape[0]==0:
+        return 0
+    else:
+        return 1
+    
 def get_map_bounding(start_x,start_y,width,height):
     position=np.zeros(shape=(1,4),dtype=np.int32)
     position[0,0]=start_x   #x_start
