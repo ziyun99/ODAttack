@@ -24,7 +24,7 @@ from torch import autograd, optim
 import torch.nn.functional as F
 
 from helper.util import *
-from helper.util_creation import get_loss_disappear,get_loss_creation_select, get_ind,get_loss_creation,get_loss_smoothness,get_map_bounding,get_random_img_ori,get_loss_median,get_loss_saturation,get_random_stop_ori
+from helper.util_creation import get_loss_disappear,get_loss_creation_select, get_ind,get_ind2,get_loss_creation,get_loss_smoothness,get_map_bounding,get_random_img_ori,get_loss_median,get_loss_saturation,get_random_stop_ori
 from helper.patch import add_patch
 from helper.patch2 import  addweight_transform_multiple, perspective_transform_multiple,inverse_perspective_transform, translation_center_multiple,gamma_transform_multiple, amplify_size,shear_transform,rotate_transform,translation_transform,gamma_transform,blur_transform,transform,transform_multiple,rescale_transform_multiple
 from helper.preprocess import prep_image, inp_to_image
@@ -91,20 +91,19 @@ class Seeing():
             return SummaryWriter(f'{self.config.logdir}/{time_str}')
         
     def attack(self):
-        ori_index = 11
-        adv_label = [1 if i == ori_index else 0 for i in range(self.num_classes)] #stop sign=11,traffic_light=9
+        adv_label = [1 if i == self.config.ori_index else 0 for i in range(self.num_classes)] #stop sign=11,traffic_light=9
         adv_label = np.array(adv_label)
         adv_label = np.reshape(adv_label,(1,self.num_classes))
         adv_label = torch.from_numpy(adv_label).float()
 
-        patch_adv, input1 = self.get_adv_episilon(adv_label, ori_index)
+        patch_adv, input1 = self.get_adv_episilon(adv_label)
 
         # self.save_img_i(patch_adv, os.path.join(self.config.out_path, 'final/adv_stop'))
         # self.det_and_save_img_i(input1, os.path.join(self.config.out_path, 'final/adv_img'))
 
         print("Done and exit")
                           
-    def get_adv_episilon(self, adv_label, ori_index):
+    def get_adv_episilon(self, adv_label):
         self.writer = self.init_tensorboard()
   
         text = "Experiment Name: " + self.config.name + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
@@ -294,7 +293,7 @@ class Seeing():
                     rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
                     prediction,feature_out = self.model(torch.clamp(input1+rn_noise,0,1), self.config.CUDA)
                     prediction_target,feature_target = self.model(torch.clamp(input2+rn_noise,0,1), self.config.CUDA)
-                    det_loss, loss_dis, satur_loss, ind_nz= self.get_loss(self.config.device, prediction, adv_label,ori_index,input1,map_resize)
+                    det_loss, loss_dis, satur_loss, ind_nz= self.get_loss(self.config.device, prediction, adv_label, self.config.ori_index, input1, map_resize)
                     fir_loss = self.get_feature_dist(start_x,end_x,start_y,end_y,feature_out,feature_target) 
                     dist_loss = torch.dist(patch_fix, original_stop0, 2)
                     
@@ -457,7 +456,7 @@ class Seeing():
                 avg_nps_loss = epoch_nps_loss/self.config.batch_size
                 avg_satur_loss = epoch_satur_loss/self.config.batch_size
             
-                print('\nEpoch, i:', i)
+                print('\nDone epoch, i:', i)
                 print('avg_total_loss:',avg_total_loss)
                 
                 if self.config.optimizer == "fgsm" and self.config.batch_variation:
@@ -527,10 +526,13 @@ class Seeing():
                 t = epoch_end - epoch_start
                 print("One epoch time taken: ", t)
                 
-                
-                if i > 0 and i % 250 == 0:
+               
+                test_start_time = time.time()
+                if i > 0 and i % self.config.test_interval == 0:                  
                     suc_rate, suc_step, total_frames = self.yolo_test(self.config.ntests, copy.deepcopy(patch_four))
                     print("suc_rate, suc_step, total_frames", suc_rate, suc_step, total_frames)
+                test_end_time = time.time()
+                init_time += test_end_time - test_start_time
                     
                 torch.cuda.empty_cache()
                 
@@ -753,7 +755,8 @@ class Seeing():
         patch_transform=img_ori[ 0,:, start_x:start_x+width,start_y:start_y+height]
         patch_pole_transform=torch.zeros(3,27,201).to(self.config.device)
 
-        suc_step=0
+        suc_step = 0
+        suc_rate = 0
         total_frames = 0
         try: 
             for i in range(num_test):
@@ -858,16 +861,16 @@ class Seeing():
                 #forward
                 rn_noise=torch.from_numpy(np.random.uniform(-0.1,0.1,size=(1,3,416,416))).float().to(self.config.device)
                 with torch.no_grad():
-                    prediction, _ = self.model(torch.clamp(input1+rn_noise,0,1), CUDA)
-                    prediction2, _ = self.model(torch.clamp(input2+rn_noise,0,1), CUDA)
-                detect=get_ind(prediction,ori_index)
-                detect2=get_ind(prediction2,ori_index)
+                    prediction, _ = self.model(torch.clamp(input1+rn_noise,0,1), self.config.CUDA)
+                    prediction2, _ = self.model(torch.clamp(input2+rn_noise,0,1), self.config.CUDA)
+                detect=get_ind2(prediction, self.config.ori_index)
+                detect2=get_ind2(prediction2, self.config.ori_index)
                 
                 
                 is_success = 0
-                if detect2 != [0]:
+                if detect2 != 0:
                     total_frames += 1
-                    if detect==[0]:
+                    if detect == 0:
                         # print("Success")
                         suc_step += 1
                         is_success = 1
@@ -881,7 +884,7 @@ class Seeing():
                     suc_rate = suc_step/total_frames
                     
                 if i % 100 == 0:  
-                    print("i:",i)
+                    print("Tests i:",i)
                     print('success_rate:', suc_rate)
                     # output_dir = "./output/yolo_test/"
                     # det_and_save_img_i(input1, i, output_dir + "adv_img") # Adversarial Example: woth background and adversarial stop sign
