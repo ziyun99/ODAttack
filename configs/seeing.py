@@ -21,7 +21,7 @@ class BaseConfig(object):
         
         # main parameters in AE generation
         self.session_name = time.strftime("%Y%m%d-%H%M%S")
-        self.nepochs = 1001  #Number of iterations
+        self.nepochs = 2001  #Number of iterations
         self.batch_size = 20
         self.save_interval = 20
 
@@ -52,7 +52,7 @@ class BaseConfig(object):
         self.nps_p = 0.5
         self.satur_p = 0.5
         self.fir_flag = True
-        self.dist_flag = True
+        self.dist_flag = False
         self.tv_flag = False
         self.nps_flag = False
         self.satur_flag = False
@@ -63,6 +63,9 @@ class BaseConfig(object):
         self.optimizer = self.optimizers[0]
         
         self.ntests = 1000
+        self.test_interval = 250
+        
+        self.ori_index = 11
         
 class Fgsm_NoBatch(BaseConfig):
     def __init__(self):
