@@ -150,7 +150,7 @@ class Seeing():
         init_time = time.time()
         suc_rate = 0
         try: 
-            for i in range(self.config.nepochs):
+            for i in range(1, self.config.nepochs + 1):
                 epoch_start = time.time()
                                     
                 epoch_total_loss = 0
@@ -160,10 +160,11 @@ class Seeing():
                 epoch_tv_loss = 0
                 epoch_nps_loss = 0
                 epoch_satur_loss = 0
+                grad_resize = 0
                     
                 original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
                 original_stop = original_stop[0, :, :, :]
-                for j in range(self.config.batch_size):
+                for j in range(1, self.config.batch_size + 1):
                     print("\nEpoch: {}, step: {}".format(i, j))
                     patch_f = patch_four * map_4_patches
                     patch_fix = original_stop * map_4_stop + patch_f
@@ -249,7 +250,7 @@ class Seeing():
 
                 
                     img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
-                    ratio = random.uniform(0.1, 0.5)
+                    ratio = random.uniform(0.1, 0.6)
                     x_c = random.randint(99,400-int(ratio*(100+201)))# x_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
                     y_c = random.randint(208-25,300)#y_c=random.randint(10+int(ratio*radius),400-int(ratio*radius))
                     width_r = math.ceil(ratio*width)
@@ -378,9 +379,6 @@ class Seeing():
 
                     if self.config.optimizer == "fgsm" and self.config.batch_variation:
                         input_grad = input1.grad.data
-                        # print("input_grad", input_grad)
-                        # input_grad = torch.sign(input_grad)
-
                         #inverse_rescale
                         grad_resize1 = input_grad[0,:,start_x:end_x,start_y:end_y]
                         grad_resize1 = cv2.resize(grad_resize1.cpu().numpy().transpose(1,2,0),(width,height),cv2.INTER_CUBIC)
@@ -388,16 +386,10 @@ class Seeing():
                            perspective = 0
                            grad_resize1 = inverse_perspective_transform(grad_resize1,org,dst)
                         grad_resize1 = torch.from_numpy(grad_resize1.transpose(2,0,1)).to(self.config.device)
-                        if j==0:
-                           grad_resize = grad_resize1          
-                        else:
-                           grad_resize += grad_resize1
+                        grad_resize += grad_resize1
 
                     if self.config.optimizer == "fgsm" and not self.config.batch_variation:
                         input_grad = input1.grad.data
-                        # print("input_grad", input_grad)
-                        # input_grad = torch.sign(input_grad)
-
                         #inverse_rescale
                         grad_resize1 = input_grad[0,:,start_x:end_x,start_y:end_y]
                         grad_resize1 = cv2.resize(grad_resize1.cpu().numpy().transpose(1,2,0),(width,height),cv2.INTER_CUBIC)
@@ -416,8 +408,6 @@ class Seeing():
                         # add epsilon
                         epsilon = 0.05 / (math.floor(i/100) + 1)
                         grad_4_patches = grad_resize * map_4_patches
-                        # print(grad_resize)
-                        # print(torch.sign(grad_4_patches))
                         epsilon_4_patches = epsilon * torch.sign(grad_4_patches) #FGSM attack
                         patch_four = patch_four - epsilon_4_patches * map_4_patches
                         patch_four = torch.clamp(patch_four, 0, 1)
@@ -446,7 +436,7 @@ class Seeing():
                     epoch_nps_loss += nps_loss
                     epoch_satur_loss += satur_loss
 
-                    # if (j + 1) % 5 == 0:
+                    # if j % 5 == 0:
                     #     iteration = self.config.batch_size * i + j
                     #     self.writer.add_scalar('loss/total_loss', loss.detach().cpu().numpy(), iteration)
                     #     self.writer.add_scalar('loss/det_loss', det_loss.detach().cpu().numpy(), iteration)
@@ -492,8 +482,6 @@ class Seeing():
                     patch_fix = torch.clamp(patch_fix, 0, 1)
             
                 elif self.config.optimizer == "adam" and self.config.batch_variation:
-                # batch variation update #need to average the grad_data in patch_four?
-                    print("Before averaging the gradients: ")
                     grad_sum = torch.sum(patch_four.grad.data)           
                     if grad_sum == 0:
                         print("WARNING: ZERO GRADIENT")
@@ -502,26 +490,9 @@ class Seeing():
                         print("ACCUMULATED GRADIENT", grad_sum)
 
                     patch_four.grad.data /= self.config.batch_size
-                    print("After averaging the gradients: ")
-                    avg_grad_sum = torch.sum(patch_four.grad.data)           
-                    if avg_grad_sum == 0:
-                        print("WARNING: ZERO GRADIENT")
-                        return
-                    else: 
-                        print("AVERAGE GRADIENT, sum:", avg_grad_sum)
-
                     optimizer.step()
-                    print("After optimizer.step()")
-                    grad_sum = torch.sum(patch_four.grad.data)
-                    print("VALID GRADIENT", grad_sum)
-
                     optimizer.zero_grad()
                     print("After zero_grad:")
-                    grad_sum = torch.sum(patch_four.grad.data)
-                    if grad_sum == 0:
-                        print("ZERO GRADIENT")
-                    else: 
-                        print("NON-ZERO GRADIENT", grad_sum)
                     # patch_four=patch_four*map_4_patches
                     patch_four.data.clamp_(0,1)       #keep patch in image range
 
@@ -539,15 +510,16 @@ class Seeing():
                 
                
                 test_start_time = time.time()
-                if self.config.run_test and (i + 1) % self.config.test_interval == 0:                  
+                if self.config.run_test and i % self.config.test_interval == 0:                  
                     suc_rate, suc_step, total_frames = self.yolo_test(self.config.ntests, copy.deepcopy(patch_four))
                     print("suc_rate, suc_step, total_frames", suc_rate, suc_step, total_frames)
+                    self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
                 test_end_time = time.time()
                 init_time += test_end_time - test_start_time
                     
                 torch.cuda.empty_cache()
                 
-                if (i + 1) % self.config.save_interval == 0:
+                if i % self.config.save_interval == 0:
                     curr_time = time.time()
                     accumulated_time = (curr_time - init_time)/60
                     # iteration = self.config.batch_size * (i+1)
@@ -559,9 +531,7 @@ class Seeing():
                     self.writer.add_scalar('avg/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
                     self.writer.add_scalar('avg/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
 
-                    # self.writer.add_scalar('misc/learning_rate', epsilon, i)
-                    self.writer.add_scalar('misc/duration', round(accumulated_time, 3), i)
-                    self.writer.add_scalar('misc/suc_rate', round(suc_rate, 3), i)
+                    self.writer.add_scalar('misc/duration', round(accumulated_time, 3), i)                    
                     self.writer.add_image('adv_stop', patch_fix.squeeze(), i)
                     self.writer.add_image('patch', patch_f.squeeze(), i)
                     self.writer.add_image('adv_img', input1.squeeze(), i)
@@ -802,7 +772,7 @@ class Seeing():
         suc_rate = 0
         total_frames = 0
         try: 
-            for i in range(num_test):
+            for i in range(1, num_test + 1):
 
                 # get_random_stop_ori # cut out the patch and paste it to different stop sign
                 original_stop = get_random_stop_ori(self.imlist_stop).to(self.config.device)
@@ -924,8 +894,8 @@ class Seeing():
                 if total_frames > 0: 
                     suc_rate = suc_step/total_frames
                     
-                if (i + 1) % 100 == 0:  
-                    print("Tests i:",i)
+                if i % 100 == 0:  
+                    print("Tests i:", i)
                     print('success_rate:', suc_rate)
 
         except KeyboardInterrupt:
