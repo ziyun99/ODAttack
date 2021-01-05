@@ -118,10 +118,11 @@ class Seeing():
     def get_adv_episilon(self, adv_label):
         self.writer = self.init_tensorboard()
   
-        text = "Experiment Name: " + self.config.name + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
-        self.writer.add_text('experiment_configuration', text, 0) 
+        text = "Experiment Name: " + self.config.name + " | optimizer: " + str(self.config.optimizer) + " | batch variation: " + str(self.config.batch_variation) + " | fir: " + str(self.config.fir_flag) + " " + str(self.config.fir_p) + " | dist: " + str(self.config.dist_flag) + " " + str(self.config.dist_p) + " | tv: " + str(self.config.tv_flag) + " " + str(self.config.tv_p) + " | nps: " + str(self.config.nps_flag) + " " + str(self.config.nps_p) + " | satur: " + str(self.config.satur_flag) + " " + str(self.config.satur_p)
+        
         self.writer.add_text('experiment_configuration', str(self.__dict__), 0) 
         self.writer.add_text('experiment_configuration', str(self.config.__dict__), 0) 
+        self.writer.add_text('experiment_configuration', text, 0) 
 
         #img_ori
         img_ori= self.get_test_input(self.inp_dim, self.config.path_img_ori)
@@ -211,28 +212,34 @@ class Seeing():
                     
                     if k % 2 == 0:
                         #perspective transform
-                        angle = random.randint(-60,60)
-                        w,h = patch_transform.shape[1:]
-                        print(w, h)
-                        w2 = (0.113*w/(45*45))*angle*angle
-                        h2 = (h/420)*angle
-                        org = torch.tensor([[[0,0],
-                                        [w,0],
-                                        [0,h],
-                                        [w,h]]], dtype = torch.float32)
+                        perspective=1
+                        if self.config.optimizer == "fgsm":
+                            patch_pers_transform,org,dst,angle=perspective_transform_multiple(patch_transform)
+                            ori_stop_perspective,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(original_stop,True,angle)
+                            ori_stop2_pers,org_abandon,dst_abandon,angle_abandon=perspective_transform_multiple(ori_stop2,True,angle)
+                        elif self.config.optimizer == "adam":
+                            angle = random.randint(-60,60)
+                            w,h = patch_transform.shape[1:]
+                            print(w, h)
+                            w2 = (0.113*w/(45*45))*angle*angle
+                            h2 = (h/420)*angle
+                            org = torch.tensor([[[0,0],
+                                            [w,0],
+                                            [0,h],
+                                            [w,h]]], dtype = torch.float32)
 
-                        dst = torch.tensor([[[0+w2,0-h2],
-                                        [w-w2,0+h2],
-                                        [0+w2,h+h2],
-                                        [w-w2,h-h2]]], dtype = torch.float32)
+                            dst = torch.tensor([[[0+w2,0-h2],
+                                            [w-w2,0+h2],
+                                            [0+w2,h+h2],
+                                            [w-w2,h-h2]]], dtype = torch.float32)
 
-                        # compute perspective transform
-                        M = kornia.get_perspective_transform(org, dst).to(self.config.device)
+                            # compute perspective transform
+                            M = kornia.get_perspective_transform(org, dst).to(self.config.device)
 
-                        # warp the original image by the found transform
-                        patch_pers_transform = kornia.warp_perspective(patch_transform.unsqueeze(0), M, dsize=(h, w)).squeeze()
-                        ori_stop_perspective = kornia.warp_perspective(original_stop.unsqueeze(0), M, dsize=(h, w)).squeeze()
-                        ori_stop2_pers = kornia.warp_perspective(ori_stop2.unsqueeze(0), M, dsize=(h, w)).squeeze()
+                            # warp the original image by the found transform
+                            patch_pers_transform = kornia.warp_perspective(patch_transform.unsqueeze(0), M, dsize=(h, w)).squeeze()
+                            ori_stop_perspective = kornia.warp_perspective(original_stop.unsqueeze(0), M, dsize=(h, w)).squeeze()
+                            ori_stop2_pers = kornia.warp_perspective(ori_stop2.unsqueeze(0), M, dsize=(h, w)).squeeze()
 
                     else:
                         patch_pers_transform = patch_transform
@@ -360,9 +367,11 @@ class Seeing():
                     if self.config.satur_flag:
                         adap = self.config.satur_p*float(det_loss.data/satur_loss.data)
                         loss = loss + adap*(satur_loss)
-
+                    
+                    print('total_loss:', loss)
                     if self.config.debug: print("loss", loss.requires_grad)
                     if self.config.debug: print("patch_four", patch_four.requires_grad)
+                    
                     print("backward")
                     loss.backward()
                     # print("After loss.backward(): patch_four grad data: ", patch_four.grad.data)
@@ -542,13 +551,13 @@ class Seeing():
                     curr_time = time.time()
                     accumulated_time = (curr_time - init_time)/60
                     # iteration = self.config.batch_size * (i+1)
-                    self.writer.add_scalar('loss/total_loss', avg_total_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('loss/det_loss', avg_det_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('loss/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
-                    self.writer.add_scalar('loss/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('loss/tv_loss', avg_tv_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('loss/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
-                    self.writer.add_scalar('loss/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/total_loss', avg_total_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/det_loss', avg_det_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/fir_loss', avg_fir_loss.detach().cpu().numpy(), i) 
+                    self.writer.add_scalar('avg/dist_loss', avg_dist_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/tv_loss', avg_tv_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/nps_loss', avg_nps_loss.detach().cpu().numpy(), i)
+                    self.writer.add_scalar('avg/satur_loss', avg_satur_loss.detach().cpu().numpy(), i)
 
                     # self.writer.add_scalar('misc/learning_rate', epsilon, i)
                     self.writer.add_scalar('misc/duration', round(accumulated_time, 3), i)
