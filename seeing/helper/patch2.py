@@ -297,10 +297,10 @@ def inverse_perspective_transform(img,org,dst):
     return result2
 
 
-def perspective_transform_multiple(img,torch=True,set_angle=100):
+def perspective_transform_multiple(img,torch=True,set_angle=1000):
     if torch:
         img=torch2cv2(img)
-    if set_angle==100:
+    if set_angle==1000:
         angle=random.randint(-60,60)
     else:
           angle=set_angle
