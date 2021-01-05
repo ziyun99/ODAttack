@@ -60,8 +60,20 @@ class Seeing():
         except FileNotFoundError:
             print ("No file or directory with the name {}".format(self.config.bg_dir))
             exit()
+
+        print("Load background images for AE generation, eg. road")
+        try:
+            self.imlist_back_test = [osp.join(osp.realpath('.'), self.config.bg_test_dir, img) for img in os.listdir(self.config.bg_test_dir) if os.path.splitext(img)[1] == '.png' or os.path.splitext(img)[1] =='.jpeg' or os.path.splitext(img)[1] =='.jpg' or os.path.splitext(img)[1] =='.BMP']
+        except NotADirectoryError:
+            self.imlist_back_test = []
+            self.imlist_back_test.append(osp.join(osp.realpath('.'), self.config.bg_test_dir))
+        except FileNotFoundError:
+            print ("No file or directory with the name {}".format(self.config.bg_test_dir))
+            exit()
+
         print(self.config.stop_dir, ": ", len(self.imlist_stop), "stop imgs")
         print(self.config.bg_dir, ": ", len(self.imlist_back), "background imgs")
+        print(self.config.bg_test_dir, ": ", len(self.imlist_back_test), "background imgs")
 
     def load_model(self):
         #Set up the neural network
@@ -811,7 +823,7 @@ class Seeing():
                     ori_stop_perspective[:,:,:]=original_stop[:,:,:]
                     ori_stop2_pers[:,:,:]=ori_stop2[:,:,:]
                 #random background
-                img_ori = get_random_img_ori(self.imlist_back).to(self.config.device)
+                img_ori = get_random_img_ori(self.imlist_back_test).to(self.config.device)
                 
                 if ((i+1)/2==0):
                         ratio = random.uniform(0.2, 1)
