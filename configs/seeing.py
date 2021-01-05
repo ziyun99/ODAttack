@@ -65,6 +65,7 @@ class BaseConfig(object):
         self.run_test = True
         self.ntests = 1000
         self.test_interval = 250
+        self.bg_test_dir = os.path.join(self.path,"imgs/bg/road_test/") 
         
         self.ori_index = 11
         
@@ -82,42 +83,44 @@ class BaseConfig(object):
 class Fgsm_NoBatch(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.name = "fgsm" + "_nobatch"
-        self.batch_variation = False
         self.optimizer = self.optimizers[0]
+        self.batch_variation = False
+        self.name = "_".join([self.optimizer, "nobatch"])
 
 class Fgsm_Batch(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.name = "fgsm" + "_batch" 
-        self.batch_variation = True
         self.optimizer = self.optimizers[0]
+        self.batch_variation = True
+        self.name = "_".join([self.optimizer, "batch"])
+
 
 class Adam_NoBatch(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.name = "adam" + "_nobatch"
-        self.batch_variation = False
-        self.optimizer = self.optimizers[1]
+        self.optimizer = self.optimizers[1]  
+        self.batch_variation = False       
+        self.name = "_".join([self.optimizer, "nobatch"])
+
 
 class Adam_Batch(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.name = "adam" + "_batch"
-        self.batch_variation = True
         self.optimizer = self.optimizers[1]
+        self.batch_variation = True
+        self.name = "_".join([self.optimizer, "batch"])        
         
 class Test(Fgsm_NoBatch):
     def __init__(self):
         super().__init__()
-        self.name = "adam" + "_batch" + "_test_mask"
-        self.batch_variation = True
         self.optimizer = self.optimizers[1]
-        self.nepochs = 10  #Number of iterations
+        self.batch_variation = False
+        self.name = "_".join([self.optimizer, "nobatch", "test"])        
+        self.nepochs = 6  #Number of iterations
         self.save_interval = 2
-        self.ntests = 10
+        self.ntests = 3
         self.test_interval = 2
-        self.from_mask = True
+        self.from_mask = False
       
 custom_configs = {
     "base": BaseConfig,
