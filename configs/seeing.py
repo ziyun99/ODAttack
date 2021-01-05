@@ -110,23 +110,65 @@ class Adam_Batch(BaseConfig):
         self.batch_variation = True
         self.name = "_".join([self.optimizer, "batch"])        
         
-class Test(Fgsm_NoBatch):
+class Test_bg(Adam_Batch):
     def __init__(self):
         super().__init__()
         self.optimizer = self.optimizers[1]
-        self.batch_variation = False
-        self.name = "_".join([self.optimizer, "nobatch", "test"])        
+        self.batch_variation = True
+        self.bg_dir = os.path.join(self.path,"imgs/bg/road/img131.jpg") 
+        self.name = "_".join([self.optimizer, "batch", "test_bg"])      
+
+class Ratio30(Adam_Batch):
+    def __init__(self):
+        super().__init__()
+        self.optimizer = self.optimizers[1]
+        self.batch_variation = True
+        self.patch_ratio = 0.30
+        self.name = "_".join([self.optimizer, "batch", "ratio30"])        
+                
+class Triangle(Adam_Batch):
+    def __init__(self):
+        super().__init__()
+        self.optimizer = self.optimizers[1]
+        self.batch_variation = True
+        self.from_mask = True
+        self.name = "_".join([self.optimizer, "batch", "triangle"])        
+        
+class Triangle2(Adam_Batch):
+    def __init__(self):
+        super().__init__()
+        self.optimizer = self.optimizers[1]
+        self.batch_variation = True
+        self.from_mask = True
+        self.path_map4patch = os.path.join(self.path,'imgs/mask/c.png')
+        self.path_map4stop = os.path.join(self.path,'imgs/mask/d.png')
+        self.name = "_".join([self.optimizer, "batch", "triangle"])
+
+
+class Test(BaseConfig):
+    def __init__(self):
+        super().__init__()
+        self.optimizer = self.optimizers[1]
+        self.batch_variation = True
+        self.name = "_".join([self.optimizer, "batch", "test"])        
         self.nepochs = 6  #Number of iterations
         self.save_interval = 2
         self.ntests = 3
         self.test_interval = 2
         self.from_mask = False
-      
+        self.patch_ratio = 0.30
+        self.from_mask = True
+        self.bg_dir = os.path.join(self.path,"imgs/bg/road/img131.jpg") 
+        
 custom_configs = {
     "base": BaseConfig,
     "fgsm_nobatch": Fgsm_NoBatch,
     "fgsm_batch": Fgsm_Batch,
     "adam_nobatch": Adam_NoBatch,
-    "adam_batch": Adam_Batch,
+    "adam_batch": Adam_Batch,    
+    "test_bg": Test_bg,
+    "ratio30": Ratio30,
+    "triangle": Triangle, 
+    "triangle2": Triangle2, 
     "test": Test,
 }
