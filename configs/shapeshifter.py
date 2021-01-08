@@ -18,6 +18,11 @@ class BaseConfig(object):
         self.path = os.path.join(os.getcwd(),'shapeshifter/')
         self.out_path = os.path.join(os.getcwd(),'shapeshifter/result/')
         self.logdir = os.path.join(self.path, LOG_DIR)
+        self.name = None
+        self.new_run = False
+        
+        self.train_steps = 8000
+        self.run_test = True
         
         self.verbose = True
         self.seed = None
@@ -244,17 +249,13 @@ class StopSignBase(ShapeshifterBase):
 class StopSignTargeted(StopSignBase):
     def __init__(self):
         super().__init__()
+        self.name = "stop_sign_targeted"
+        self.new_run = True
         self.victim = "stop sign"
         self.target = "person"
         self.rpn_cls_weight = 0 
         self.box_cls_weight = 1 
-
-
-class StopSignTargeted_Patch(StopSignTargeted):
-    def __init__(self):
-        super().__init__()
-        self.textures_masks = [os.path.join(self.path, DATA_DIR + "patch_four.png")]
-        
+  
 # 2d_stopsign_untargeted_attack ## Create 2d stop sign that is not detected as a stop sign.
 class StopSignUntargeted(StopSignBase):
     def __init__(self):
@@ -473,6 +474,23 @@ class PersonHybridUntargeted3D(PersonBase3D):
         self.rpn_cls_weight = -1
         self.box_cls_weight = -5
 
+        
+class Patch(StopSignTargeted):
+    def __init__(self):
+        super().__init__()
+        self.name = "patch"
+        self.new_run = False
+        self.textures_masks = [os.path.join(self.path, DATA_DIR + "patch_mask.png")]
+        
+class Triangle(StopSignTargeted):
+    def __init__(self):
+        super().__init__()
+        self.name = "triangle"
+        self.new_run = False
+        self.textures_masks = [os.path.join(self.path, DATA_DIR + "triangle_mask.png")]          
+#         self.run_test = False
+#         self.save_texture_every = 2
+        
 custom_configs = {
     "base": BaseConfig,
     "stop_t": StopSignTargeted,
@@ -487,7 +505,8 @@ custom_configs = {
     "person_hybrid_t": PersonHybridTargeted,
     "person_hybrid_ut": PersonHybridUntargeted,
 
-    "stop_t_patch": StopSignTargeted_Patch,
+    "patch": Patch,
+    "triangle": Triangle,
     # "person_t_3d": PersonTargeted3D,
     # "person_ut_3d": PersonUntargeted3D,
     # "person_p_3d": PersonProposal3D,
