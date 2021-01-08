@@ -183,26 +183,43 @@ class Shapeshifter(object):
         self.saver = tf.train.Saver([textures_var_, tf.train.get_global_step()])
         self.train_writer = None
         self.test_writer = None
-
+        
         if self.config.logdir is not None:
             self.log.debug(f"Tensorboard logging: {self.config.logdir}")
             os.makedirs(self.config.logdir, exist_ok=True)
 
-            arguments_summary_ = tf.summary.text('Arguments', tf.constant('```' + ' '.join(sys.argv[1:]) + '```'))
+            arguments_summary_ = tf.summary.text('experiment_configuration', tf.constant(str(self.config.__dict__)))
+            # arguments_summary_ = tf.summary.text('Arguments', tf.constant('```' + ' '.join(sys.argv[1:]) + '```'))
             # TODO: Save argparse
 
+            time_str = time.strftime("%Y%m%d-%H%M%S")
             graph = None
             if self.config.save_graph:
                 self.log.debug("Graph will be saved to tensorboard")
                 graph = tf.get_default_graph()
-
-            self.train_writer = tf.summary.FileWriter(self.config.logdir + '/train', graph=graph)
-            self.test_writer = tf.summary.FileWriter(self.config.logdir + '/test')
-
-            # Find existing checkpoint
-            os.makedirs(self.config.logdir + '/checkpoints', exist_ok=True)
-            checkpoint_path = tf.train.latest_checkpoint(self.config.logdir + '/checkpoints')
-            self.config.checkpoint = checkpoint_path
+            
+            if self.config.name is not None:
+                self.train_writer = tf.summary.FileWriter(f'{self.config.logdir}/{self.config.name}/train', graph=graph)
+                self.test_writer = tf.summary.FileWriter(f'{self.config.logdir}/{self.config.name}/test')
+                os.makedirs(f'{self.config.logdir}/{self.config.name}/checkpoints', exist_ok=True)
+            else:
+                self.train_writer = tf.summary.FileWriter(f'{self.config.logdir}/{time_str}/train', graph=graph)
+                self.test_writer = tf.summary.FileWriter(f'{self.config.logdir}/{time_str}/test')
+                os.makedirs(f'{self.config.logdir}/checkpoints', exist_ok=True)
+                
+            print(self.config.new_run)
+            if not self.config.new_run:
+                print("find ckpt")
+                # Find existing checkpoint
+                if self.config.name is not None:
+                    checkpoint_path = tf.train.latest_checkpoint(f'{self.config.logdir}/{self.config.name}/checkpoints')
+                    self.config.checkpoint = checkpoint_path
+                else:
+                    checkpoint_path = tf.train.latest_checkpoint(f'{self.config.logdir}/checkpoints')
+                    self.config.checkpoint = checkpoint_path
+            else:
+                print('new run!!')
+                self.config.checkpoint = None
 
         # Create session
         self.log.debug("Creating session")
@@ -214,10 +231,15 @@ class Shapeshifter(object):
         sess.run(local_init_op_)
 
         # Set initial texture
-        if self.config.checkpoint is not None:
-            self.log.debug(f"Restoring from checkpoint: {self.config.checkpoint}")
-            self.saver.restore(sess, self.config.checkpoint)
+        if not self.config.new_run: 
+            if self.config.checkpoint is not None:
+                self.log.debug(f"Restoring from checkpoint: {self.config.checkpoint}")
+                self.saver.restore(sess, self.config.checkpoint)
+            else:
+                print("ckpt not found")
+                return
         else:
+            print("new run")
             if self.config.gray_start:
                 self.log.debug("Setting texture to gray")
                 textures = np.zeros_like(textures) + 128/255
@@ -280,7 +302,7 @@ class Shapeshifter(object):
 
                         'victim_class:0': self.config.victim_class,
                         'target_class:0': self.config.target_class }
-
+        init_time = time.time()
     # def attack(self):
         # Keep attacking until CTRL+C. The only issue is that we may be in the middle of some operation.
         try:
@@ -289,14 +311,19 @@ class Shapeshifter(object):
                 # Run summaries as necessary
                 if self.config.logdir and step % self.config.save_checkpoint_every == 0:
                     self.log.debug("Saving checkpoint")
-                    self.saver.save(sess, self.config.logdir + '/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
+                    if self.config.name is not None:
+                        self.saver.save(sess, f'{self.config.logdir}/{self.config.name}/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
+                    else:
+                        self.saver.save(sess, f'{self.config.logdir}/checkpoints/texture', global_step=step, write_meta_graph=False, write_state=True)
+
 
                 if step % self.config.save_texture_every == 0 and self.test_writer is not None:
                     self.log.debug("Writing texture summary")
                     test_texture = sess.run(texture_summary_)
                     self.test_writer.add_summary(test_texture, step)
-
-                if step % self.config.save_test_every == 0:
+                
+                test_start_time = time.time()
+                if self.config.run_test and step % self.config.save_test_every == 0:
                     self.log.debug("Runnning test summaries")
                     start_time = time.time()
 
@@ -316,7 +343,9 @@ class Shapeshifter(object):
                         self.log.debug("Writing test summaries")
                         test_summaries = sess.run(summaries_, test_feed_dict)
                         self.test_writer.add_summary(test_summaries, step)
-
+                test_end_time = time.time()
+                init_time += test_end_time - test_start_time
+                
                 # Create train feed_dict
                 train_feed_dict = test_feed_dict.copy()
 
@@ -345,7 +374,7 @@ class Shapeshifter(object):
 
                 end_time = time.time()
                 self.log.debug(f"Gradient accumulation took {end_time - start_time} seconds")
-
+                
                 train_output = sess.run(output_tensors, train_feed_dict)
                 self.log.info('train %d %s', step, train_output)
 
@@ -353,13 +382,23 @@ class Shapeshifter(object):
                     self.log.debug("Writing train summaries")
                     train_summaries = sess.run(summaries_, test_feed_dict)
                     self.train_writer.add_summary(train_summaries, step)
-
+                
                 # Update textures and project texture to feasible set
                 # TODO: We can probably run these together but probably need some control dependency
                 self.log.debug("Projecting attack")
                 sess.run('attack_op', train_feed_dict)
                 sess.run('project_op')
                 step = sess.run('global_step:0')
+                
+                curr_time = time.time()
+                t = curr_time - init_time
+                print("duration: ", t)
+#                 time_taken = tf.summary.scalar('misc/duration', t)
+#                 duration = sess.run(time_taken)
+#                 self.train_writer.add_summary(duration, step)
+                if step > self.config.train_steps:
+                    print("Done and exit")
+                    return
 
         except KeyboardInterrupt:
             self.log.warn('Interrupted')
